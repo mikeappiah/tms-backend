@@ -1,0 +1,37 @@
+version = 0.1
+
+[test]
+[test.deploy]
+[test.deploy.parameters]
+stack_name = "tms-backend-test-stack"
+s3_bucket = "tms-backend-test-bkt"
+s3_prefix = "test-artifacts"
+region = "eu-central-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "Environment=\"test\""
+image_repositories = []
+resolve_s3 = false
+
+[test.sync]
+[test.sync.parameters]
+stack_name = "tms-backend-test"
+watch = true
+
+[test.package]
+[test.package.parameters]
+output_template_file = "packaged-test.yaml"
+
+[prod]
+[prod.deploy]
+[prod.deploy.parameters]
+stack_name = "tms-backend-prod-stack"
+s3_bucket = "tms-backend-prod-bkt"
+s3_prefix = "prod-artifacts"
+region = "eu-central-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "Environment=prod"
+fail_on_empty_changeset = true
+image_repositories = []
+resolve_s3 = false

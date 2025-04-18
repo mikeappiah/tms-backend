@@ -1,0 +1,645 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Task Management System Backend
+
+Parameters:
+  Environment:
+    Type: String
+    Default: test
+    AllowedValues:
+      - test
+      - prod
+    Description: Environment name
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, 'prod']
+
+Globals:
+  Function:
+    Timeout: !If [IsProd, 60, 30]
+    Runtime: nodejs22.x
+    MemorySize: !If [IsProd, 256, 128]
+    Environment:
+      Variables:
+        TASKS_TABLE: !Ref TasksTable
+        USERS_TABLE: !Ref UsersTable
+        TASK_ASSIGNMENT_TOPIC: !Ref TaskAssignmentNotificationTopic
+        TASK_DEADLINE_TOPIC: !Ref TaskDeadlineNotificationTopic
+        CLOSED_TASK_TOPIC: !Ref ClosedTaskNotificationTopic
+        TASK_COMPLETE_TOPIC: !Ref TaskCompleteNotificationTopic
+        TASK_QUEUE: !Ref TaskQueue
+        DEADLINE_QUEUE: !Ref DeadlineQueue
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        REGION: !Ref AWS::Region
+        ENVIRONMENT: !Ref Environment
+
+Resources:
+  # DynamoDB Tables
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-TasksTable'
+      AttributeDefinitions:
+        - AttributeName: taskId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: taskId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserTasksIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: taskId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-UsersTable'
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+
+  # Cognito User Pool - Fixed by removing custom attribute configuration
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${Environment}-TaskManagementUserPool'
+      AutoVerifiedAttributes:
+        - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          RequireLowercase: true
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      UsernameConfiguration:
+        CaseSensitive: false
+      DeletionProtection: !If [IsProd, ACTIVE, INACTIVE]
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub '${Environment}-TaskManagementClient'
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  # SNS Topics
+  TaskAssignmentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-TaskAssignmentNotificationTopic'
+
+  TaskDeadlineNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-TaskDeadlineNotificationTopic'
+
+  ClosedTaskNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-ClosedTaskNotificationTopic'
+
+  TaskCompleteNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-TaskCompleteNotificationTopic'
+
+  # SQS Queues - Fixed FIFO queue configuration
+  TaskQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-TaskQueue.fifo'
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: !If [IsProd, 120, 60]
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt TaskDeadLetterQueue.Arn
+        maxReceiveCount: !If [IsProd, 5, 3]
+
+  TaskDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-TaskDeadLetterQueue.fifo'
+      FifoQueue: true
+      ContentBasedDeduplication: true
+
+  DeadlineQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-DeadlineQueue.fifo'
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: !If [IsProd, 120, 60]
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadlineDeadLetterQueue.Arn
+        maxReceiveCount: !If [IsProd, 5, 3]
+
+  DeadlineDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-DeadlineDeadLetterQueue.fifo'
+      FifoQueue: true
+      ContentBasedDeduplication: true
+
+  # Step Functions for SNS Subscriptions
+  SubscribeUserStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub '${Environment}-SubscribeUserStateMachine'
+      Definition:
+        StartAt: ParallelSubscriptions
+        States:
+          ParallelSubscriptions:
+            Type: Parallel
+            Next: Complete
+            Branches:
+              - StartAt: SubscribeAssignment
+                States:
+                  SubscribeAssignment:
+                    Type: Task
+                    Resource: !GetAtt SubscribeAssignmentFunction.Arn
+                    End: true
+              - StartAt: SubscribeDeadline
+                States:
+                  SubscribeDeadline:
+                    Type: Task
+                    Resource: !GetAtt SubscribeDeadlineFunction.Arn
+                    End: true
+              - StartAt: SubscribeClosed
+                States:
+                  SubscribeClosed:
+                    Type: Task
+                    Resource: !GetAtt SubscribeClosedFunction.Arn
+                    End: true
+          Complete:
+            Type: Succeed
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SubscribeAssignmentFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SubscribeDeadlineFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SubscribeClosedFunction
+        - CloudWatchLogsFullAccess
+
+  ProcessDeadlineStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub '${Environment}-ProcessDeadlineStateMachine'
+      Definition:
+        StartAt: ParallelActions
+        States:
+          ParallelActions:
+            Type: Parallel
+            Next: Complete
+            Branches:
+              - StartAt: UpdateTaskStatus
+                States:
+                  UpdateTaskStatus:
+                    Type: Task
+                    Resource: !GetAtt UpdateTaskExpiredFunction.Arn
+                    End: true
+              - StartAt: NotifyUsers
+                States:
+                  NotifyUsers:
+                    Type: Task
+                    Resource: !GetAtt NotifyExpiredFunction.Arn
+                    End: true
+          Complete:
+            Type: Succeed
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateTaskExpiredFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NotifyExpiredFunction
+        - CloudWatchLogsFullAccess
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingBurstLimit: !If [IsProd, 50, 20]
+          ThrottlingRateLimit: !If [IsProd, 25, 10]
+
+  # Lambda Functions - Auth
+  SignInFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SignInFunction'
+      CodeUri: ./
+      Handler: src/auth/authenticate.handler
+      Policies:
+        - AmazonCognitoPowerUser
+        - AWSLambdaBasicExecutionRole
+      Events:
+        SignIn:
+          Type: Api
+          Properties:
+            Path: /signin
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: NONE
+
+  ResetPasswordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ResetPasswordFunction'
+      CodeUri: ./
+      Handler: src/auth/resetPassword.handler
+      Policies:
+        - AmazonCognitoPowerUser
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ResetPassword:
+          Type: Api
+          Properties:
+            Path: /reset-password
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: NONE
+
+  # Lambda Functions - Users
+  CreateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-CreateUserFunction'
+      CodeUri: ./
+      Handler: src/users/createUser.handler
+      Policies:
+        - AmazonCognitoPowerUser
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt SubscribeUserStateMachine.Name
+      Events:
+        CreateUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: POST
+            RestApiId: !Ref ApiGateway
+
+  ListUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ListUsersFunction'
+      CodeUri: ./
+      Handler: src/users/listUsers.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        ListUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: GET
+            RestApiId: !Ref ApiGateway
+
+  # Lambda Functions - Tasks
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-CreateTaskFunction'
+      CodeUri: ./
+      Handler: src/tasks/createTask.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt TaskQueue.QueueName
+      Events:
+        CreateTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: POST
+            RestApiId: !Ref ApiGateway
+
+  UpdateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-UpdateTaskFunction'
+      CodeUri: ./
+      Handler: src/tasks/updateTask.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskCompleteNotificationTopic.TopicName
+      Events:
+        UpdateTask:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+
+  ReopenTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ReopenTaskFunction'
+      CodeUri: ./
+      Handler: src/tasks/reopenTask.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt TaskQueue.QueueName
+      Events:
+        ReopenTask:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}/reopen
+            Method: POST
+            RestApiId: !Ref ApiGateway
+
+  ListTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ListTasksFunction'
+      CodeUri: ./
+      Handler: src/tasks/listTasks.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        ListTasks:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: GET
+            RestApiId: !Ref ApiGateway
+
+  UpdateTaskExpiredFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-UpdateTaskExpiredFunction'
+      CodeUri: ./
+      Handler: src/tasks/updateTaskExpired.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+
+  # Lambda Functions - Notifications
+  SubscribeAssignmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SubscribeAssignmentFunction'
+      CodeUri: ./
+      Handler: src/notifications/subscribeAssignment.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+
+  SubscribeDeadlineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SubscribeDeadlineFunction'
+      CodeUri: ./
+      Handler: src/notifications/subscribeDeadline.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
+
+  SubscribeClosedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SubscribeClosedFunction'
+      CodeUri: ./
+      Handler: src/notifications/subscribeClosed.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
+
+  NotifyExpiredFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-NotifyExpiredFunction'
+      CodeUri: ./
+      Handler: src/notifications/notifyExpired.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
+
+  # Lambda Functions - Queues
+  ProcessTaskQueueFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ProcessTaskQueueFunction'
+      CodeUri: ./
+      Handler: src/queues/processTaskQueue.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource: '*'
+      Events:
+        TaskQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt TaskQueue.Arn
+            BatchSize: !If [IsProd, 5, 1]
+
+  ProcessDeadlineQueueFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ProcessDeadlineQueueFunction'
+      CodeUri: ./
+      Handler: src/queues/processDeadlineQueue.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt ProcessDeadlineStateMachine.Name
+      Events:
+        DeadlineQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DeadlineQueue.Arn
+            BatchSize: !If [IsProd, 5, 1]
+
+  # Lambda Functions - Schedulers
+  DeadlineCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-DeadlineCheckFunction'
+      CodeUri: ./
+      Handler: src/schedulers/deadlineCheck.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DeadlineQueue.QueueName
+
+  DeadlineScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${Environment}-TaskDeadlineScheduler'
+      ScheduleExpression: !If [IsProd, 'rate(15 minutes)', 'rate(1 hour)']
+      Target:
+        Arn: !GetAtt DeadlineCheckFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+      FlexibleTimeWindow:
+        Mode: "OFF"
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-SchedulerRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub '${Environment}-InvokeLambda'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt DeadlineCheckFunction.Arn
+
+  # Log Groups for Lambda Functions with retention periods
+  SignInFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SignInFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  ResetPasswordFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ResetPasswordFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  CreateUserFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${CreateUserFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  ListUsersFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ListUsersFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  CreateTaskFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${CreateTaskFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  UpdateTaskFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${UpdateTaskFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  ReopenTaskFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ReopenTaskFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  ListTasksFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ListTasksFunction}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  CognitoClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref CognitoUserPoolClient
+  EnvironmentName:
+    Description: Current environment
+    Value: !Ref Environment
