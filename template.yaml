@@ -480,7 +480,7 @@ Resources:
       Handler: src/notifications/subscribeAssignment.handler
       Policies:
         - AWSLambdaBasicExecutionRole
-        - SNSPublishMessagePolicy:
+        - SNSCrudPolicy:
             TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
 
   SubscribeDeadlineFunction:
@@ -491,7 +491,7 @@ Resources:
       Handler: src/notifications/subscribeDeadline.handler
       Policies:
         - AWSLambdaBasicExecutionRole
-        - SNSPublishMessagePolicy:
+        - SNSCrudPolicy:
             TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
 
   SubscribeClosedFunction:
@@ -502,7 +502,7 @@ Resources:
       Handler: src/notifications/subscribeClosed.handler
       Policies:
         - AWSLambdaBasicExecutionRole
-        - SNSPublishMessagePolicy:
+        - SNSCrudPolicy:
             TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
 
   NotifyExpiredFunction:
@@ -513,7 +513,7 @@ Resources:
       Handler: src/notifications/notifyExpired.handler
       Policies:
         - AWSLambdaBasicExecutionRole
-        - SNSPublishMessagePolicy:
+        - SNSCrudPolicy:
             TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
 
   # Lambda Functions - Queues
