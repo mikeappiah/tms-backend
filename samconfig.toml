@@ -13,14 +13,6 @@ parameter_overrides = "Environment=\"test\""
 image_repositories = []
 resolve_s3 = false
 
-[test.sync]
-[test.sync.parameters]
-stack_name = "tms-backend-test"
-watch = true
-
-[test.package]
-[test.package.parameters]
-output_template_file = "packaged-test.yaml"
 
 [prod]
 [prod.deploy]
