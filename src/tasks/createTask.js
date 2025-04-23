@@ -1,135 +1,71 @@
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
-const sqs = new AWS.SQS();
-const { v4: uuidv4 } = require('uuid');
+const {
+  errorResponse,
+  successResponse,
+  isValidISODate,
+  isAdmin,
+  createTaskObject,
+  sendNotification
+} = require('./utils');
 
 exports.handler = async (event) => {
   try {
-    
     const claims = event.requestContext.authorizer.claims;
-    console.log("CLAIMS OUTPUT: ", claims);
-    
+
     // Check admin
-    const userGroups = claims['cognito:groups'] || [];
-    if (!userGroups.includes(process.env.ADMIN_GROUP_NAME)) {
-      return {
-        statusCode: 403,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Admin access required' })
-      };
+    if (!isAdmin(claims)) {
+      return errorResponse(403, 'Admin access required');
     }
 
-    const { userId, name, description, responsibility, deadline } = JSON.parse(event.body);
-    
+    const body = JSON.parse(event.body);
+    const { userId, name, description, responsibility, deadline } = body;
+
     // Validate inputs
     if (!name || !description || !responsibility || !deadline || !userId) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Missing required fields' })
-      };
+      return errorResponse(400, 'Missing required fields');
     }
 
-    // Validate deadline format (ISO string)
+    // Validate deadline format
     if (!isValidISODate(deadline)) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Invalid deadline format. Use ISO date format.' })
-      };
+      return errorResponse(400, 'Invalid deadline format. Use ISO date format.');
     }
 
-    // Generate task ID
+    // Generate task ID and create task
     const taskId = uuidv4();
-    
-    // Create task object
-    const task = {
-      taskId,
-      userId,
-      name,
-      description,
-      responsibility,
-      status: 'open',
-      userComment: '',
-      deadline,
-      completedAt: null,
-      createdBy: claims.sub,
-      createdAt: new Date().toISOString(),
-      lastUpdatedAt: new Date().toISOString(),
-    };
+    const task = createTaskObject(taskId, userId, body, claims);
 
-    // Store in TasksTable
+    // Store in DynamoDB
     await dynamodb.put({
       TableName: process.env.TASKS_TABLE,
       Item: task
     }).promise();
 
-    // Queueing task for processing
+    // Queue task for processing
     await sqs.sendMessage({
       QueueUrl: process.env.TASK_QUEUE,
-      MessageBody: JSON.stringify({ 
-        taskId, 
+      MessageBody: JSON.stringify({
+        taskId,
         userId,
-        action: 'CREATE' 
+        action: 'CREATE'
       }),
       MessageGroupId: taskId,
       MessageDeduplicationId: `${taskId}-${Date.now()}`
     }).promise();
 
-    return {
-      statusCode: 201,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        message: 'Task created successfully',
-        task: {
-          taskId,
-          userId,
-          name,
-          description,
-          responsibility,
-          status: 'open',
-          deadline,
-        }
-      })
-    };
+    return successResponse(201, 'Task created successfully', {
+      task: {
+        taskId,
+        userId,
+        name,
+        description,
+        responsibility,
+        status: 'open',
+        deadline,
+      }
+    });
   } catch (error) {
     console.error('Create task error:', error);
-    
-    // Error handling
-    return {
-      statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        code: error.code || 'InternalServerError'
-      })
-    };
+    return errorResponse(500, 'Internal server error', {
+      code: error.code || 'InternalServerError'
+    });
   }
 };
-
-
-function isValidISODate(dateString) {
-  const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
-
-  if (!isoRegex.test(dateString)) {
-    return false;
-  }
-
-  const date = new Date(dateString);
-  return date instanceof Date && !isNaN(date.getTime());
-}
