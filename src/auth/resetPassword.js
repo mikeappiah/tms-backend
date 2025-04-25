@@ -1,11 +1,29 @@
 const AWS = require("aws-sdk");
 const COMMON = require("../../utils/constants");
+const { getCookies } = require("../../utils/helpers");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 
 exports.handler = async (event) => {
     try {
-        const { username, session, newPassword } = JSON.parse(event.body);
+        const cookies = getCookies(event.headers);
+        const session = cookies.session;
+
+        if (!session) {
+            return {
+                statusCode: COMMON.STATUS_CODES.UNAUTHORIZED,
+                headers: {
+                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
+                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
+                },
+                body: JSON.stringify({
+                    error: COMMON.ERROR.SESSION_EXPIRED,
+                    code: COMMON.EXCEPTIONS.NOT_AUTHORIZED
+                }),
+            };
+        }
+
+        const { username, newPassword } = JSON.parse(event.body);
 
         // Using adminRespondToAuthChallenge flow
         const params = {

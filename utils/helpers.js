@@ -24,4 +24,16 @@ function generateSecurePassword() {
         .join("");
 }
 
-module.exports = { generateSecurePassword };
+// Helper function to get cookies from headers
+const getCookies = (headers) => {
+    const cookies = {};
+    if (headers.cookie) {
+        headers.cookie.split(';').forEach(cookie => {
+            const parts = cookie.split('=');
+            cookies[parts[0].trim()] = parts[1].trim();
+        });
+    }
+    return cookies;
+};
+
+module.exports = { generateSecurePassword, getCookies };

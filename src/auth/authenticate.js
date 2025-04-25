@@ -22,14 +22,14 @@ exports.handler = async (event) => {
 
         if (response.ChallengeName === "NEW_PASSWORD_REQUIRED") {
             return {
-                statusCode: 200,
+                statusCode: COMMON.STATUS_CODES.OK,
                 headers: {
                     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
+                    "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`
                 },
                 body: JSON.stringify({
                     challenge: "NEW_PASSWORD_REQUIRED",
-                    session: response.Session,
                     message: COMMON.ERROR.NEW_PASSWORD_REQUIRED,
                 }),
             };
@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 
         // Return tokens on successful authentication
         return {
-            statusCode: 200,
+            statusCode: COMMON.STATUS_CODES.OK,
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
@@ -69,7 +69,7 @@ exports.handler = async (event) => {
         }
 
         return {
-            statusCode,
+            statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
