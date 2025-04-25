@@ -6,6 +6,7 @@ const {
   createTaskObject,
   sendNotification
 } = require('./utils');
+const { v4: uuidv4 } = require('uuid');
 
 exports.handler = async (event) => {
   try {

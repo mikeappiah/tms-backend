@@ -1,5 +1,4 @@
 const AWS = require('aws-sdk');
-const { v4: uuidv4 } = require('uuid');
 
 // Initialize AWS SDK clients
 const dynamodb = new AWS.DynamoDB.DocumentClient();
