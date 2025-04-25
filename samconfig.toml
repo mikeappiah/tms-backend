@@ -4,8 +4,7 @@ version = 0.1
 [test.deploy]
 [test.deploy.parameters]
 stack_name = "tms-backend-test-stack"
-s3_bucket = "tms-backend-test-bkt"
-s3_prefix = "test-artifacts"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-bgtabgwkidqm"
 region = "eu-central-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
