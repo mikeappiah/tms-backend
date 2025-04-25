@@ -4,11 +4,15 @@
     "description": "Backend for Task Management System",
     "main": "index.js",
     "scripts": {
-      "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
-      "aws-sdk": "^2.1650.0",
-      "uuid": "^9.0.1"
+        "@aws-sdk/client-dynamodb": "^3.796.0",
+        "@aws-sdk/client-sns": "^3.796.0",
+        "@aws-sdk/client-sqs": "^3.796.0",
+        "@aws-sdk/lib-dynamodb": "^3.796.0",
+        "aws-sdk": "^2.1650.0",
+        "uuid": "^9.0.1"
     },
     "author": "",
     "license": "ISC"
