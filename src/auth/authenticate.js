@@ -43,6 +43,7 @@ exports.handler = async (event) => {
             },
             body: JSON.stringify({
                 token: response.AuthenticationResult.IdToken,
+                role: response.AuthenticationResult.Claims.role,
             }),
         };
     } catch (error) {

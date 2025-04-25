@@ -11,27 +11,22 @@ function generateSecurePassword() {
     password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
     password += numbers.charAt(Math.floor(Math.random() * numbers.length));
 
-    // Adding more random characters to reach minimum length (8)
     const allChars = special + lowercase + uppercase + numbers;
     for (let i = 0; i < 8; i++) {
         password += allChars.charAt(Math.floor(Math.random() * allChars.length));
     }
 
-    // Shuffling the password to avoid predictable patterns
     return password
         .split("")
         .sort(() => 0.5 - Math.random())
         .join("");
 }
 
-// Helper function to get cookies from headers
 const getCookies = (headers) => {
     const cookies = {};
-    if (headers.cookie) {
-        headers.cookie.split(';').forEach(cookie => {
-            const parts = cookie.split('=');
-            cookies[parts[0].trim()] = parts[1].trim();
-        });
+    if (headers.Cookie) {
+        const data = headers.Cookie.split("=")[1];
+        cookies.session = data;
     }
     return cookies;
 };
