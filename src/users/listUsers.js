@@ -1,75 +1,34 @@
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+const {
+  errorResponse,
+  successResponse,
+  isAdmin,
+  getPaginatedUsers,
+  parsePaginationToken,
+  formatPaginationResponse
+} = require('./userUtils');
 
 exports.handler = async (event) => {
   try {
-    // Verify if admin
-    const claims = event.requestContext.authorizer.claims;
-    const userGroups = claims['cognito:groups'] || [];
-    
-    if (!userGroups.includes(process.env.ADMIN_GROUP_NAME)) {
-      return {
-        statusCode: 403,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Admin access required' })
-      };
+    // Verify admin status
+    if (!isAdmin(event.requestContext.authorizer.claims)) {
+      return errorResponse(403, 'Admin access required');
     }
 
-    // Get query parameters for pagination
+    // Get pagination parameters
     const queryParams = event.queryStringParameters || {};
     const limit = parseInt(queryParams.limit) || 50;
-    const lastEvaluatedKey = queryParams.nextToken ? 
-      JSON.parse(Buffer.from(queryParams.nextToken, 'base64').toString()) : 
-      undefined;
+    const lastEvaluatedKey = parsePaginationToken(queryParams.nextToken);
 
-    // Scan the table with pagination
-    const params = {
-      TableName: process.env.USERS_TABLE,
-      Limit: limit
-    };
+    // Get paginated users
+    const result = await getPaginatedUsers(limit, lastEvaluatedKey);
 
-    if (lastEvaluatedKey) {
-      params.ExclusiveStartKey = lastEvaluatedKey;
-    }
-
-    const result = await dynamodb.scan(params).promise();
-
-    // Prepare response with pagination token if needed
-    const response = {
-      users: result.Items,
-      count: result.Count
-    };
-
-    if (result.LastEvaluatedKey) {
-      response.nextToken = Buffer.from(
-        JSON.stringify(result.LastEvaluatedKey)
-      ).toString('base64');
-    }
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(response)
-    };
+    return successResponse(200, 'Users retrieved successfully',
+      formatPaginationResponse(result)
+    );
   } catch (error) {
     console.error('List users error:', error);
-    
-    return {
-      statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        error: 'Failed to retrieve users',
-        message: error.message
-      })
-    };
+    return errorResponse(500, 'Failed to retrieve users', {
+      message: error.message
+    });
   }
 };

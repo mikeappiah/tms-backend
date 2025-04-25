@@ -1,38 +1,22 @@
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
-const sns = new AWS.SNS();
+const {
+  errorResponse,
+  successResponse,
+  getTask,
+  sendNotification
+} = require('./utils');
 
 exports.handler = async (event) => {
   try {
-    
     const { taskId } = JSON.parse(event.input || '{}');
-    
+
     if (!taskId) {
-      console.error('Missing required taskId parameter');
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Missing required taskId parameter' })
-      };
+      return errorResponse(400, 'Missing required taskId parameter');
     }
-    
-    // Get task details before updating
-    const taskResult = await dynamodb.get({
-      TableName: process.env.TASKS_TABLE,
-      Key: { taskId }
-    }).promise();
-    
-    if (!taskResult.Item) {
-      console.error('Task not found:', taskId);
-      return {
-        statusCode: 404,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Task not found' })
-      };
+
+    // Get task details
+    const task = await getTask(taskId);
+    if (!task) {
+      return errorResponse(404, 'Task not found');
     }
 
     // Update task status to expired
@@ -46,62 +30,42 @@ exports.handler = async (event) => {
         ':lastUpdatedAt': new Date().toISOString()
       }
     }).promise();
-    
-    // Notify both the assigned user and admin about expired task
-    if (taskResult.Item.userId) {
-      await sns.publish({
-        TopicArn: process.env.TASK_NOTIFICATION_TOPIC,
-        Message: JSON.stringify({
-          message: `Task "${taskResult.Item.name}" has expired! The deadline was ${taskResult.Item.deadline}`,
-          taskId: taskId,
-          taskName: taskResult.Item.name,
-          taskDescription: taskResult.Item.description,
-          deadline: taskResult.Item.deadline,
-          status: 'expired'
-        }),
-        Subject: `Task Expired: ${taskResult.Item.name}`,
-        MessageAttributes: {
-          userId: { DataType: 'String', StringValue: taskResult.Item.userId }
-        }
-      }).promise();
-    }
-    
-    // Also notify admin group
-    await sns.publish({
-      TopicArn: process.env.ADMIN_NOTIFICATION_TOPIC,
-      Message: JSON.stringify({
-        message: `Task "${taskResult.Item.name}" assigned to user ${taskResult.Item.userId} has expired! The deadline was ${taskResult.Item.deadline}`,
-        taskId: taskId,
-        taskName: taskResult.Item.name,
-        assignedTo: taskResult.Item.userId,
-        deadline: taskResult.Item.deadline,
-        status: 'expired'
-      }),
-      Subject: `Task Expired Alert: ${taskResult.Item.name}`
-    }).promise();
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json'
+    // Notify user and admin
+    if (task.userId) {
+      await sendNotification(
+        process.env.TASK_NOTIFICATION_TOPIC,
+        {
+          message: `Task "${task.name}" has expired! The deadline was ${task.deadline}`,
+          taskId,
+          taskName: task.name,
+          taskDescription: task.description,
+          deadline: task.deadline,
+          status: 'expired'
+        },
+        `Task Expired: ${task.name}`,
+        { userId: { DataType: 'String', StringValue: task.userId } }
+      );
+    }
+
+    await sendNotification(
+      process.env.ADMIN_NOTIFICATION_TOPIC,
+      {
+        message: `Task "${task.name}" assigned to user ${task.userId} has expired! The deadline was ${task.deadline}`,
+        taskId,
+        taskName: task.name,
+        assignedTo: task.userId,
+        deadline: task.deadline,
+        status: 'expired'
       },
-      body: JSON.stringify({ 
-        message: 'Task status updated to expired',
-        taskId
-      })
-    };
+      `Task Expired Alert: ${task.name}`
+    );
+
+    return successResponse(200, 'Task status updated to expired', { taskId });
   } catch (error) {
     console.error('Update task expired error:', error);
-    
-    return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        code: error.code || 'InternalServerError'
-      })
-    };
+    return errorResponse(500, 'Internal server error', {
+      code: error.code || 'InternalServerError'
+    });
   }
 };
