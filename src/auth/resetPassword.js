@@ -27,7 +27,7 @@ exports.handler = async (event) => {
 
         // Using adminRespondToAuthChallenge flow
         const params = {
-            ChallengeName: COMMON.ERROR.NEW_PASSWORD_REQUIRED,
+            ChallengeName: "NEW_PASSWORD_REQUIRED",
             ClientId: process.env.COGNITO_CLIENT_ID,
             UserPoolId: process.env.COGNITO_USER_POOL_ID,
             ChallengeResponses: {
@@ -37,7 +37,7 @@ exports.handler = async (event) => {
             Session: session,
         };
 
-        const response = await cognito.adminRespondToAuthChallenge(params).promise();
+        await cognito.adminRespondToAuthChallenge(params).promise();
 
         return {
             statusCode: 200,
@@ -46,11 +46,7 @@ exports.handler = async (event) => {
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
             },
             body: JSON.stringify({
-                idToken: response.AuthenticationResult.IdToken,
-                accessToken: response.AuthenticationResult.AccessToken,
-                refreshToken: response.AuthenticationResult.RefreshToken,
-                expiresIn: response.AuthenticationResult.ExpiresIn,
-                tokenType: response.AuthenticationResult.TokenType,
+                message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,
             }),
         };
     } catch (error) {

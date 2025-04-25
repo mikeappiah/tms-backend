@@ -16,6 +16,7 @@ exports.COMMON = {
     SUCCESS_MSG: {
         SUBSCRIBED_CLOSED_NOTIFICATION: "Successfully subscribed to closed task notifications",
         SUBSCRIBED_TASK_DEADLINE_NOTIFICATION: "Successfully subscribed to task deadline notifications",
+        PASSWORD_RESET_SUCCESS: "Password reset successfully",
     },
     EXCEPTIONS: {
         INVALID_PARAMETER: "InvalidParameterException",
