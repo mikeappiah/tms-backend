@@ -341,8 +341,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-CreateUserFunction'
-      CodeUri: ./
-      Handler: src/users/createUser.handler
+      CodeUri: ./src/users
+      Handler: createUser.handler
       Environment:
         Variables:
           SUBSCRIBE_USER_STATE_MACHINE_ARN: !GetAtt SubscribeUserStateMachine.Arn
@@ -365,8 +365,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-ListUsersFunction'
-      CodeUri: ./
-      Handler: src/users/listUsers.handler
+      CodeUri: ./src/users
+      Handler: listUsers.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBReadPolicy:
@@ -375,17 +375,55 @@ Resources:
         ListUsers:
           Type: Api
           Properties:
-            Path: /users
+            Path: /users/
             Method: GET
             RestApiId: !Ref ApiGateway
+  
+  ListUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ListUserFunction'
+      CodeUri: ./src/users
+      Handler: listUser.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        ListUser:
+          Type: Api
+          Properties:
+            Path: /users/{userId}
+            Method: GET
+            RestApiId: !Ref ApiGateway
+
+  deleteUserFunction:
+    Type: AWS::Serverless::Fucntion
+    Properties:
+      FunctionName: !Sub '${Environment}-DeleteUserFunction'
+      CodeUri: ./src/users
+      Handler: deleteUser.handler
+      Policies:
+        - AmazonCognitoPowerUser
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        DeleteUser:
+          Type: Api
+          Properties:
+            Path: /users/{userId}
+            Method: DELETE
+            RestApiId: !Ref ApiGateway
+
 
   # Lambda Functions - Tasks
   CreateTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-CreateTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/createTask.handler
+      CodeUri: ./src/tasks
+      Handler: createTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -404,8 +442,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-UpdateTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/updateTask.handler
+      CodeUri: ./src/tasks
+      Handler: updateTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -424,8 +462,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-ReopenTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/reopenTask.handler
+      CodeUri: ./src/tasks
+      Handler: reopenTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -446,8 +484,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-ListTasksFunction'
-      CodeUri: ./
-      Handler: src/tasks/listTasks.handler
+      CodeUri: ./src/tasks
+      Handler: listTasks.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBReadPolicy:
@@ -464,8 +502,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-UpdateTaskExpiredFunction'
-      CodeUri: ./
-      Handler: src/tasks/updateTaskExpired.handler
+      CodeUri: ./src/tasks
+      Handler: updateTaskExpired.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
