@@ -1,5 +1,5 @@
 const AWS = require("aws-sdk");
-const COMMON = require("../../utils/constants");
+const { COMMON } = require("../../utils/constants");
 const { getCookies } = require("../../utils/helpers");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
@@ -18,7 +18,7 @@ exports.handler = async (event) => {
                 },
                 body: JSON.stringify({
                     error: COMMON.ERROR.SESSION_EXPIRED,
-                    code: COMMON.EXCEPTIONS.NOT_AUTHORIZED
+                    code: COMMON.EXCEPTIONS.NOT_AUTHORIZED,
                 }),
             };
         }

@@ -1,5 +1,5 @@
 const AWS = require("aws-sdk");
-const COMMON = require("../../utils/constants");
+const { COMMON } = require("../../utils/constants");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 
@@ -7,7 +7,6 @@ exports.handler = async (event) => {
     try {
         const { username, password } = JSON.parse(event.body);
 
-        // Use ADMIN_USER_PASSWORD_AUTH flow
         const params = {
             AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
             ClientId: process.env.COGNITO_CLIENT_ID,
@@ -26,7 +25,7 @@ exports.handler = async (event) => {
                 headers: {
                     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                    "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`
+                    "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`,
                 },
                 body: JSON.stringify({
                     challenge: "NEW_PASSWORD_REQUIRED",
