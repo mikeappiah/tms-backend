@@ -42,11 +42,7 @@ exports.handler = async (event) => {
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
             },
             body: JSON.stringify({
-                idToken: response.AuthenticationResult.IdToken,
-                accessToken: response.AuthenticationResult.AccessToken,
-                refreshToken: response.AuthenticationResult.RefreshToken,
-                expiresIn: response.AuthenticationResult.ExpiresIn,
-                tokenType: response.AuthenticationResult.TokenType,
+                token: response.AuthenticationResult.IdToken,
             }),
         };
     } catch (error) {
