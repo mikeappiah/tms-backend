@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       .promise();
 
     //Generation of userId
-    const userId = uuidv4();
+    const userId = Math.random().toString(36).substr(2, 8);
 
     // Store in UsersTable
     await dynamodb
