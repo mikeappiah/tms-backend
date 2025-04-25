@@ -384,8 +384,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-CreateTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/createTask.handler
+      CodeUri: ./src/tasks
+      Handler: handlers/createTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -404,8 +404,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-UpdateTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/updateTask.handler
+      CodeUri: ./src/tasks
+      Handler: handlers/updateTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -424,8 +424,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-ReopenTaskFunction'
-      CodeUri: ./
-      Handler: src/tasks/reopenTask.handler
+      CodeUri: ./src/tasks
+      Handler: handlers/reopenTask.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
@@ -446,8 +446,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-ListTasksFunction'
-      CodeUri: ./
-      Handler: src/tasks/listTasks.handler
+      CodeUri: ./src/tasks
+      Handler: handlers/listTasks.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBReadPolicy:
@@ -464,8 +464,9 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-UpdateTaskExpiredFunction'
-      CodeUri: ./
-      Handler: src/tasks/updateTaskExpired.handler
+      CodeUri: ./src/tasks
+
+      Handler: handlers/updateTaskExpired.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - DynamoDBCrudPolicy:
