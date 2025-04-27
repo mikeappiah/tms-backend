@@ -35,6 +35,8 @@ Globals:
         MEMBER_GROUP_NAME: !Ref MemberGroup
         REGION: !Ref AWS::Region
         ENVIRONMENT: !Ref Environment
+        FRONTEND_URL: localhost:3000/tms/signin
+        SES_SENDER_EMAIL: no-reply@tms-nodejs-group.com
 
 Resources:
   # DynamoDB Tables

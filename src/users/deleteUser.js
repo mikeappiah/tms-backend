@@ -1,0 +1,121 @@
+const AWS = require('aws-sdk');
+const cognito = new AWS.CognitoIdentityServiceProvider();
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
+  try {
+    // Admin check
+    const claims = event.requestContext.authorizer.claims;
+    
+    // User group check 
+    const userGroups = claims['cognito:groups'] || [];
+    if (!userGroups.includes(process.env.ADMIN_GROUP_NAME)) {
+      return {
+        statusCode: 403,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ error: 'Admin access required' })
+      };
+    }
+
+    // Getting userId from path parameters
+    const { userId } = event.pathParameters;
+    
+    if (!userId) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ error: 'User ID is required' })
+      };
+    }
+
+    // Verifying user existence
+    const userResponse = await dynamodb.get({
+      TableName: process.env.USERS_TABLE,
+      Key: { userId }
+    }).promise();
+
+    if (!userResponse.Item) {
+      return {
+        statusCode: 404,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ error: 'User not found' })
+      };
+    }
+
+    const user = userResponse.Item;
+
+    // Preventing admins from deleting themselves
+    if (user.userId === claims.sub) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ error: 'You cannot delete your own account' })
+      };
+    }
+
+    // Deleting user from Cognito
+    await cognito.adminDeleteUser({
+      UserPoolId: process.env.COGNITO_USER_POOL_ID,
+      Username: userId
+    }).promise();
+
+    // Delete the user from DynamoDB
+    await dynamodb.delete({
+      TableName: process.env.USERS_TABLE,
+      Key: { userId }
+    }).promise();
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        message: 'User deleted successfully',
+        userId: userId
+      })
+    };
+  } catch (error) {
+    console.error('Delete user error:', error);
+    
+    // Error handling
+    let statusCode = 500;
+    let errorMessage = 'Internal server error';
+    
+    if (error.code === 'UserNotFoundException') {
+      statusCode = 404;
+      errorMessage = 'User not found in Cognito';
+    } else if (error.code === 'ResourceNotFoundException') {
+      statusCode = 404;
+      errorMessage = 'User not found';
+    } else if (error.code === 'AccessDeniedException') {
+      statusCode = 403;
+      errorMessage = 'Access denied to delete this user';
+    }
+    
+    return {
+      statusCode,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        error: errorMessage,
+        code: error.code || 'InternalServerError'
+      })
+    };
+  }
+};

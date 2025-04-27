@@ -2,8 +2,10 @@ const AWS = require("aws-sdk");
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const sfn = new AWS.StepFunctions();
-const { generateSecurePassword } = require("../../utils/helpers");
+const ses = new AWS.SES();
+const { generateSecurePassword, sendWelcomeEmail } = require("../../utils/helpers");
 const cuid = require("cuid");
+
 
 exports.handler = async (event) => {
 	try {
@@ -23,7 +25,7 @@ exports.handler = async (event) => {
 			};
 		}
 
-		const { email, firstName, lastName, role } = JSON.parse(event.body);
+		const { email, name, role } = JSON.parse(event.body);
 
 		// Validate inputs
 		if (!email || !["admin", "member"].includes(role)) {
@@ -44,15 +46,18 @@ exports.handler = async (event) => {
 		const user = await cognito
 			.adminCreateUser({
 				UserPoolId: process.env.COGNITO_USER_POOL_ID,
-				Username: email,
+				name,
+                email,
 				TemporaryPassword: tempPassword,
 				UserAttributes: [
 					{ Name: "email", Value: email },
 					{ Name: "email_verified", Value: "true" }, // Not bothering ourselves with email verification now!
 				],
-				// MessageAction: 'SUPPRESS'
+				MessageAction: 'SUPPRESS' // Suppress default Cognito email
 			})
 			.promise();
+
+            console.log('User details: ', user);
 
 		// Add user to appropriate Cognito group based on role
 		await cognito
@@ -73,15 +78,17 @@ exports.handler = async (event) => {
 				Item: {
 					userId: cuid(),
 					email,
-					firstName: firstName,
-					lastName: lastName,
+					name,
 					role,
+                    profile_pic: '',
 					createdAt: new Date().toISOString(),
 					createdBy: claims.sub,
-					status: "FORCE_CHANGE_PASSWORD",
 				},
 			})
 			.promise();
+
+		// Send custom welcome email with credentials
+		await sendWelcomeEmail(email, name, tempPassword);
 
 		// Start Step Function for SNS subscriptions
 		await sfn
@@ -102,18 +109,18 @@ exports.handler = async (event) => {
 			},
 			body: JSON.stringify({
 				message: "User created successfully",
-				user: {
-					userId: user.User.Username,
-					email,
-					role,
-					status: "FORCE_CHANGE_PASSWORD",
-				},
+				email:
+                    process.env.ENVIRONMENT === "test"
+                            ? email
+                            : undefined,
 				tempPassword:
 					process.env.ENVIRONMENT === "test"
 						? tempPassword
-						: undefined, // Only returning password in test environment for testing
+						: undefined, // Only returning email & password in test environment for testing
 			}),
 		};
+        
+
 	} catch (error) {
 		console.error("Create user error:", error);
 
@@ -145,3 +152,7 @@ exports.handler = async (event) => {
 		};
 	}
 };
+
+
+
+
