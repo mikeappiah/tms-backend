@@ -11,7 +11,7 @@ confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
 parameter_overrides = "Environment=\"test\""
 image_repositories = []
-resolve_s3 = true
+resolve_s3 = false
 
 
 [prod]
