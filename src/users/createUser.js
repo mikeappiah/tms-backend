@@ -2,7 +2,6 @@ const AWS = require("aws-sdk");
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const sfn = new AWS.StepFunctions();
-const ses = new AWS.SES();
 const { generateSecurePassword, sendWelcomeEmail } = require("../../utils/helpers");
 const cuid = require("cuid");
 

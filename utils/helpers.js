@@ -1,3 +1,6 @@
+const AWS = require("aws-sdk");
+const ses = new AWS.SES();
+
 function generateSecurePassword() {
     const special = "!@#$%^&*()_+=-";
     const lowercase = "abcdefghijklmnopqrstuvwxyz";
