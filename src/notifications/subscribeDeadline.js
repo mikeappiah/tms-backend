@@ -1,61 +1,57 @@
-const AWS = require('aws-sdk');
+const AWS = require("aws-sdk");
+const COMMON = require("../../utils/constants");
 const sns = new AWS.SNS();
 
 exports.handler = async (event) => {
-  console.log('Subscribe Deadline Function invoked with:', JSON.stringify(event));
-  
-  try {
-    // Extract email from the event object directly
-    let email;
-    
-    if (typeof event === 'object') {
-      if (event.email) {
-        // Direct object containing email field
-        email = event.email;
-      } else if (event.input && typeof event.input === 'string') {
-        // If input is provided as a JSON string (uncommon case)
-        const parsed = JSON.parse(event.input);
-        email = parsed.email;
-      } else if (event.body && typeof event.body === 'string') {
-        // From API Gateway
-        const parsed = JSON.parse(event.body);
-        email = parsed.email;
-      }
+    try {
+        // Extract email from the event object directly
+        let email;
+
+        if (typeof event === "object") {
+            if (event.email) {
+                // Direct object containing email field
+                email = event.email;
+            } else if (event.input && typeof event.input === "string") {
+                // If input is provided as a JSON string (uncommon case)
+                const parsed = JSON.parse(event.input);
+                email = parsed.email;
+            } else if (event.body && typeof event.body === "string") {
+                // From API Gateway
+                const parsed = JSON.parse(event.body);
+                email = parsed.email;
+            }
+        }
+
+        // Check if email was found
+        if (!email) {
+            throw new Error("No email address found in the input");
+        }
+
+        // Subscribe to SNS Topic
+        const subscriptionResult = await sns
+            .subscribe({
+                TopicArn: process.env.TASK_DEADLINE_TOPIC,
+                Protocol: "email",
+                Endpoint: email,
+            })
+            .promise();
+
+        return {
+            statusCode: COMMON.STATUS_CODES.OK,
+            body: JSON.stringify({
+                message: COMMON.SUCCESS_MSG.SUBSCRIBED_TASK_DEADLINE_NOTIFICATION,
+                subscriptionArn: subscriptionResult.SubscriptionArn,
+            }),
+        };
+    } catch (error) {
+        console.error("Error subscribing to topic:", error);
+
+        return {
+            statusCode: error.statusCode || 500,
+            body: JSON.stringify({
+                error: error.message || COMMON.ERROR.FAILED_TO_SUBSCRIBE_TASK_DEADLINE_NOTIFICATION,
+                details: error.code ? `AWS Error Code: ${error.code}` : undefined,
+            }),
+        };
     }
-    
-    // Check if email was found
-    if (!email) {
-      console.error('No email found in the event:', event);
-      throw new Error('No email address found in the input');
-    }
-    
-    console.log(`Subscribing email ${email} to topic ${process.env.TASK_DEADLINE_TOPIC}`);
-    
-    // Subscribe to SNS Topic
-    const subscriptionResult = await sns.subscribe({
-      TopicArn: process.env.TASK_DEADLINE_TOPIC,
-      Protocol: 'email',
-      Endpoint: email
-    }).promise();
-    
-    console.log('Subscription successful:', subscriptionResult);
-    
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ 
-        message: 'Successfully subscribed to task deadline notifications',
-        subscriptionArn: subscriptionResult.SubscriptionArn
-      })
-    };
-  } catch (error) {
-    console.error('Error subscribing to topic:', error);
-    
-    return {
-      statusCode: error.statusCode || 500,
-      body: JSON.stringify({ 
-        error: error.message || 'Failed to subscribe to task deadline notifications',
-        details: error.code ? `AWS Error Code: ${error.code}` : undefined
-      })
-    };
-  }
 };

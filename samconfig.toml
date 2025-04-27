@@ -5,13 +5,13 @@ version = 0.1
 [test.deploy.parameters]
 stack_name = "tms-backend-test-stack"
 s3_bucket = "tms-backend-test-bkt"
-s3_prefix = "test-artifacts"
+s3_prefix = "tms-backend-test-stack"
 region = "eu-central-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
 parameter_overrides = "Environment=\"test\""
 image_repositories = []
-resolve_s3 = false
+resolve_s3 = true
 
 
 [prod]

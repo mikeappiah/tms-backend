@@ -7,18 +7,18 @@ Parameters:
     Type: String
     Default: test
     AllowedValues:
-      - test
-      - prod
+    - test
+    - prod
     Description: Environment name
 
 Conditions:
-  IsProd: !Equals [!Ref Environment, 'prod']
+  IsProd: !Equals [ !Ref Environment, 'prod' ]
 
 Globals:
   Function:
-    Timeout: !If [IsProd, 60, 30]
+    Timeout: !If [ IsProd, 60, 30 ]
     Runtime: nodejs22.x
-    MemorySize: !If [IsProd, 256, 128]
+    MemorySize: !If [ IsProd, 256, 128 ]
     Environment:
       Variables:
         TASKS_TABLE: !Ref TasksTable
@@ -43,48 +43,48 @@ Resources:
     Properties:
       TableName: !Sub '${Environment}-TasksTable'
       AttributeDefinitions:
-        - AttributeName: taskId
-          AttributeType: S
-        - AttributeName: userId
-          AttributeType: S
+      - AttributeName: taskId
+        AttributeType: S
+      - AttributeName: userId
+        AttributeType: S
       KeySchema:
-        - AttributeName: taskId
-          KeyType: HASH
+      - AttributeName: taskId
+        KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: UserTasksIndex
-          KeySchema:
-            - AttributeName: userId
-              KeyType: HASH
-            - AttributeName: taskId
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
+      - IndexName: UserTasksIndex
+        KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: taskId
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+        PointInTimeRecoveryEnabled: !If [ IsProd, true, false ]
 
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub '${Environment}-UsersTable'
       AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: email
-          AttributeType: S
+      - AttributeName: userId
+        AttributeType: S
+      - AttributeName: email
+        AttributeType: S
       KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
+      - AttributeName: userId
+        KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: EmailIndex
-          KeySchema:
-            - AttributeName: email
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
+      - IndexName: EmailIndex
+        KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+        PointInTimeRecoveryEnabled: !If [ IsProd, true, false ]
 
   # Cognito User Pool
   CognitoUserPool:
@@ -92,11 +92,11 @@ Resources:
     Properties:
       UserPoolName: !Sub '${Environment}-TaskManagementUserPool'
       AutoVerifiedAttributes:
-        - email
+      - email
       Schema:
-        - Name: email
-          AttributeDataType: String
-          Required: true
+      - Name: email
+        AttributeDataType: String
+        Required: true
       Policies:
         PasswordPolicy:
           MinimumLength: 8
@@ -110,7 +110,7 @@ Resources:
         EmailSendingAccount: COGNITO_DEFAULT
       UsernameConfiguration:
         CaseSensitive: false
-      DeletionProtection: !If [IsProd, ACTIVE, INACTIVE]
+      DeletionProtection: !If [ IsProd, ACTIVE, INACTIVE ]
 
   # Cognito User Pool Groups for Role-Based Access Control
   AdminGroup:
@@ -119,7 +119,7 @@ Resources:
       GroupName: admin
       UserPoolId: !Ref CognitoUserPool
       Description: "Administrators group with full access"
-      Precedence: 0  # Lower number means higher precedence
+      Precedence: 0 # Lower number means higher precedence
 
   MemberGroup:
     Type: AWS::Cognito::UserPoolGroup
@@ -136,15 +136,15 @@ Resources:
       ClientName: !Sub '${Environment}-TaskManagementClient'
       GenerateSecret: false
       ExplicitAuthFlows:
-        - ALLOW_ADMIN_USER_PASSWORD_AUTH
-        - ALLOW_USER_SRP_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
+      - ALLOW_ADMIN_USER_PASSWORD_AUTH
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
       PreventUserExistenceErrors: ENABLED
       # Including group information in the token
       ReadAttributes:
-        - email
+      - email
       WriteAttributes:
-        - email
+      - email
 
   # SNS Topics
   TaskAssignmentNotificationTopic:
@@ -174,10 +174,10 @@ Resources:
       QueueName: !Sub '${Environment}-TaskQueue.fifo'
       FifoQueue: true
       ContentBasedDeduplication: true
-      VisibilityTimeout: !If [IsProd, 120, 60]
+      VisibilityTimeout: !If [ IsProd, 120, 60 ]
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt TaskDeadLetterQueue.Arn
-        maxReceiveCount: !If [IsProd, 5, 3]
+        maxReceiveCount: !If [ IsProd, 5, 3 ]
 
   TaskDeadLetterQueue:
     Type: AWS::SQS::Queue
@@ -192,10 +192,10 @@ Resources:
       QueueName: !Sub '${Environment}-DeadlineQueue.fifo'
       FifoQueue: true
       ContentBasedDeduplication: true
-      VisibilityTimeout: !If [IsProd, 120, 60]
+      VisibilityTimeout: !If [ IsProd, 120, 60 ]
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt DeadlineDeadLetterQueue.Arn
-        maxReceiveCount: !If [IsProd, 5, 3]
+        maxReceiveCount: !If [ IsProd, 5, 3 ]
 
   DeadlineDeadLetterQueue:
     Type: AWS::SQS::Queue
@@ -216,34 +216,34 @@ Resources:
             Type: Parallel
             Next: Complete
             Branches:
-              - StartAt: SubscribeAssignment
-                States:
-                  SubscribeAssignment:
-                    Type: Task
-                    Resource: !GetAtt SubscribeAssignmentFunction.Arn
-                    End: true
-              - StartAt: SubscribeDeadline
-                States:
-                  SubscribeDeadline:
-                    Type: Task
-                    Resource: !GetAtt SubscribeDeadlineFunction.Arn
-                    End: true
-              - StartAt: SubscribeClosed
-                States:
-                  SubscribeClosed:
-                    Type: Task
-                    Resource: !GetAtt SubscribeClosedFunction.Arn
-                    End: true
+            - StartAt: SubscribeAssignment
+              States:
+                SubscribeAssignment:
+                  Type: Task
+                  Resource: !GetAtt SubscribeAssignmentFunction.Arn
+                  End: true
+            - StartAt: SubscribeDeadline
+              States:
+                SubscribeDeadline:
+                  Type: Task
+                  Resource: !GetAtt SubscribeDeadlineFunction.Arn
+                  End: true
+            - StartAt: SubscribeClosed
+              States:
+                SubscribeClosed:
+                  Type: Task
+                  Resource: !GetAtt SubscribeClosedFunction.Arn
+                  End: true
           Complete:
             Type: Succeed
       Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref SubscribeAssignmentFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref SubscribeDeadlineFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref SubscribeClosedFunction
-        - CloudWatchLogsFullAccess
+      - LambdaInvokePolicy:
+          FunctionName: !Ref SubscribeAssignmentFunction
+      - LambdaInvokePolicy:
+          FunctionName: !Ref SubscribeDeadlineFunction
+      - LambdaInvokePolicy:
+          FunctionName: !Ref SubscribeClosedFunction
+      - CloudWatchLogsFullAccess
 
   ProcessDeadlineStateMachine:
     Type: AWS::Serverless::StateMachine
@@ -256,26 +256,26 @@ Resources:
             Type: Parallel
             Next: Complete
             Branches:
-              - StartAt: UpdateTaskStatus
-                States:
-                  UpdateTaskStatus:
-                    Type: Task
-                    Resource: !GetAtt UpdateTaskExpiredFunction.Arn
-                    End: true
-              - StartAt: NotifyUsers
-                States:
-                  NotifyUsers:
-                    Type: Task
-                    Resource: !GetAtt NotifyExpiredFunction.Arn
-                    End: true
+            - StartAt: UpdateTaskStatus
+              States:
+                UpdateTaskStatus:
+                  Type: Task
+                  Resource: !GetAtt UpdateTaskExpiredFunction.Arn
+                  End: true
+            - StartAt: NotifyUsers
+              States:
+                NotifyUsers:
+                  Type: Task
+                  Resource: !GetAtt NotifyExpiredFunction.Arn
+                  End: true
           Complete:
             Type: Succeed
       Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref UpdateTaskExpiredFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref NotifyExpiredFunction
-        - CloudWatchLogsFullAccess
+      - LambdaInvokePolicy:
+          FunctionName: !Ref UpdateTaskExpiredFunction
+      - LambdaInvokePolicy:
+          FunctionName: !Ref NotifyExpiredFunction
+      - CloudWatchLogsFullAccess
 
   # API Gateway
   ApiGateway:
@@ -292,10 +292,10 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'*'"
       MethodSettings:
-        - ResourcePath: "/*"
-          HttpMethod: "*"
-          ThrottlingBurstLimit: !If [IsProd, 50, 20]
-          ThrottlingRateLimit: !If [IsProd, 25, 10]
+      - ResourcePath: "/*"
+        HttpMethod: "*"
+        ThrottlingBurstLimit: !If [ IsProd, 50, 20 ]
+        ThrottlingRateLimit: !If [ IsProd, 25, 10 ]
 
   # Lambda Functions - Auth
   SignInFunction:
@@ -305,8 +305,8 @@ Resources:
       CodeUri: ./
       Handler: src/auth/authenticate.handler
       Policies:
-        - AmazonCognitoPowerUser
-        - AWSLambdaBasicExecutionRole
+      - AmazonCognitoPowerUser
+      - AWSLambdaBasicExecutionRole
       Events:
         SignIn:
           Type: Api
@@ -324,8 +324,8 @@ Resources:
       CodeUri: ./
       Handler: src/auth/resetPassword.handler
       Policies:
-        - AmazonCognitoPowerUser
-        - AWSLambdaBasicExecutionRole
+      - AmazonCognitoPowerUser
+      - AWSLambdaBasicExecutionRole
       Events:
         ResetPassword:
           Type: Api
@@ -347,12 +347,12 @@ Resources:
         Variables:
           SUBSCRIBE_USER_STATE_MACHINE_ARN: !GetAtt SubscribeUserStateMachine.Arn
       Policies:
-        - AmazonCognitoPowerUser
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref UsersTable
-        - StepFunctionsExecutionPolicy:
-            StateMachineName: !GetAtt SubscribeUserStateMachine.Name
+      - AmazonCognitoPowerUser
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
+      - StepFunctionsExecutionPolicy:
+          StateMachineName: !GetAtt SubscribeUserStateMachine.Name
       Events:
         CreateUser:
           Type: Api
@@ -368,9 +368,9 @@ Resources:
       CodeUri: ./
       Handler: src/users/listUsers.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBReadPolicy:
-            TableName: !Ref UsersTable
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBReadPolicy:
+          TableName: !Ref UsersTable
       Events:
         ListUsers:
           Type: Api
@@ -387,11 +387,11 @@ Resources:
       CodeUri: ./
       Handler: src/tasks/createTask.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt TaskQueue.QueueName
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TasksTable
+      - SQSSendMessagePolicy:
+          QueueName: !GetAtt TaskQueue.QueueName
       Events:
         CreateTask:
           Type: Api
@@ -407,11 +407,11 @@ Resources:
       CodeUri: ./
       Handler: src/tasks/updateTask.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt TaskCompleteNotificationTopic.TopicName
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TasksTable
+      - SNSPublishMessagePolicy:
+          TopicName: !GetAtt TaskCompleteNotificationTopic.TopicName
       Events:
         UpdateTask:
           Type: Api
@@ -427,13 +427,13 @@ Resources:
       CodeUri: ./
       Handler: src/tasks/reopenTask.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt TaskQueue.QueueName
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TasksTable
+      - SNSPublishMessagePolicy:
+          TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+      - SQSSendMessagePolicy:
+          QueueName: !GetAtt TaskQueue.QueueName
       Events:
         ReopenTask:
           Type: Api
@@ -449,9 +449,9 @@ Resources:
       CodeUri: ./
       Handler: src/tasks/listTasks.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBReadPolicy:
-            TableName: !Ref TasksTable
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBReadPolicy:
+          TableName: !Ref TasksTable
       Events:
         ListTasks:
           Type: Api
@@ -467,9 +467,9 @@ Resources:
       CodeUri: ./
       Handler: src/tasks/updateTaskExpired.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TasksTable
 
   # Lambda Functions - Notifications
   SubscribeAssignmentFunction:
@@ -479,9 +479,9 @@ Resources:
       CodeUri: ./
       Handler: src/notifications/subscribeAssignment.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - SNSCrudPolicy:
-            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+      - AWSLambdaBasicExecutionRole
+      - SNSCrudPolicy:
+          TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
 
   SubscribeDeadlineFunction:
     Type: AWS::Serverless::Function
@@ -490,9 +490,9 @@ Resources:
       CodeUri: ./
       Handler: src/notifications/subscribeDeadline.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - SNSCrudPolicy:
-            TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
+      - AWSLambdaBasicExecutionRole
+      - SNSCrudPolicy:
+          TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
 
   SubscribeClosedFunction:
     Type: AWS::Serverless::Function
@@ -501,9 +501,9 @@ Resources:
       CodeUri: ./
       Handler: src/notifications/subscribeClosed.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - SNSCrudPolicy:
-            TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
+      - AWSLambdaBasicExecutionRole
+      - SNSCrudPolicy:
+          TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
 
   NotifyExpiredFunction:
     Type: AWS::Serverless::Function
@@ -512,9 +512,9 @@ Resources:
       CodeUri: ./
       Handler: src/notifications/notifyExpired.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - SNSCrudPolicy:
-            TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
+      - AWSLambdaBasicExecutionRole
+      - SNSCrudPolicy:
+          TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
 
   # Lambda Functions - Queues
   ProcessTaskQueueFunction:
@@ -524,26 +524,26 @@ Resources:
       CodeUri: ./
       Handler: src/queues/processTaskQueue.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref UsersTable
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
-        - Statement:
-            - Effect: Allow
-              Action:
-                - events:PutEvents
-              Resource: '*'
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TasksTable
+      - DynamoDBReadPolicy:
+          TableName: !Ref UsersTable
+      - SNSPublishMessagePolicy:
+          TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+      - SNSPublishMessagePolicy:
+          TopicName: !GetAtt TaskDeadlineNotificationTopic.TopicName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - events:PutEvents
+          Resource: '*'
       Events:
         TaskQueueEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt TaskQueue.Arn
-            BatchSize: !If [IsProd, 5, 1]
+            BatchSize: !If [ IsProd, 5, 1 ]
 
   ProcessDeadlineQueueFunction:
     Type: AWS::Serverless::Function
@@ -552,17 +552,17 @@ Resources:
       CodeUri: ./
       Handler: src/queues/processDeadlineQueue.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBReadPolicy:
-            TableName: !Ref TasksTable
-        - StepFunctionsExecutionPolicy:
-            StateMachineName: !GetAtt ProcessDeadlineStateMachine.Name
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBReadPolicy:
+          TableName: !Ref TasksTable
+      - StepFunctionsExecutionPolicy:
+          StateMachineName: !GetAtt ProcessDeadlineStateMachine.Name
       Events:
         DeadlineQueueEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt DeadlineQueue.Arn
-            BatchSize: !If [IsProd, 5, 1]
+            BatchSize: !If [ IsProd, 5, 1 ]
 
   # Lambda Functions - Schedulers
   DeadlineCheckFunction:
@@ -572,17 +572,17 @@ Resources:
       CodeUri: ./
       Handler: src/schedulers/deadlineCheck.handler
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - DynamoDBReadPolicy:
-            TableName: !Ref TasksTable
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt DeadlineQueue.QueueName
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBReadPolicy:
+          TableName: !Ref TasksTable
+      - SQSSendMessagePolicy:
+          QueueName: !GetAtt DeadlineQueue.QueueName
 
   DeadlineScheduler:
     Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub '${Environment}-TaskDeadlineScheduler'
-      ScheduleExpression: !If [IsProd, 'rate(15 minutes)', 'rate(1 hour)']
+      ScheduleExpression: !If [ IsProd, 'rate(15 minutes)', 'rate(1 hour)' ]
       Target:
         Arn: !GetAtt DeadlineCheckFunction.Arn
         RoleArn: !GetAtt SchedulerRole.Arn
@@ -596,68 +596,68 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
-            Principal:
-              Service: scheduler.amazonaws.com
-            Action: sts:AssumeRole
+        - Effect: Allow
+          Principal:
+            Service: scheduler.amazonaws.com
+          Action: sts:AssumeRole
       Policies:
-        - PolicyName: !Sub '${Environment}-InvokeLambda'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !GetAtt DeadlineCheckFunction.Arn
+      - PolicyName: !Sub '${Environment}-InvokeLambda'
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource: !GetAtt DeadlineCheckFunction.Arn
 
   # Log Groups for Lambda Functions with retention periods
   SignInFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${SignInFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   ResetPasswordFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ResetPasswordFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   CreateUserFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${CreateUserFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   ListUsersFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ListUsersFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   CreateTaskFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${CreateTaskFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   UpdateTaskFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${UpdateTaskFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   ReopenTaskFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ReopenTaskFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
   ListTasksFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ListTasksFunction}'
-      RetentionInDays: !If [IsProd, 30, 7]
+      RetentionInDays: !If [ IsProd, 30, 7 ]
 
 Outputs:
   ApiUrl:
