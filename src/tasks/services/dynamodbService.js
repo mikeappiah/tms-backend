@@ -30,18 +30,22 @@ class DynamoService {
     }
 
     async updateItem(key, updateExpression, expressionAttributeNames, expressionAttributeValues, returnValues = "ALL_NEW") {
-        const result = await docClient.send(
-            new UpdateCommand({
-                TableName: this.tableName,
-                Key: key,
-                UpdateExpression: updateExpression,
-                ExpressionAttributeNames: expressionAttributeNames,
-                ExpressionAttributeValues: expressionAttributeValues,
-                ReturnValues: returnValues,
-            })
-        );
+        const updateParams = {
+            TableName: this.tableName,
+            Key: key,
+            UpdateExpression: updateExpression,
+            ExpressionAttributeValues: expressionAttributeValues,
+            ReturnValues: returnValues,
+        };
+
+        if (expressionAttributeNames && Object.keys(expressionAttributeNames).length > 0) {
+            updateParams.ExpressionAttributeNames = expressionAttributeNames;
+        }
+
+        const result = await docClient.send(new UpdateCommand(updateParams));
         return result.Attributes;
     }
+
 
     async scan(filterExpression = null, expressionAttributeValues = null) {
         const params = {
