@@ -465,7 +465,6 @@ Resources:
     Properties:
       FunctionName: !Sub '${Environment}-UpdateTaskExpiredFunction'
       CodeUri: ./src/tasks
-
       Handler: handlers/updateTaskExpired.handler
       Policies:
         - AWSLambdaBasicExecutionRole
