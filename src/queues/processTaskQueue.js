@@ -42,7 +42,7 @@ exports.handler = async (event) => {
           taskDescription: task.description,
           taskResponsibility: task.responsibility,
           deadline: task.deadline,
-          recipientName: `${user.firstName} ${user.lastName}`.trim(),
+          recipientName: `${user.name}`.trim(),
           message: `Task "${task.name}" has been assigned to you. Deadline: ${new Date(task.deadline).toLocaleString()}`,
           taskId: task.taskId
         }),
@@ -56,8 +56,8 @@ exports.handler = async (event) => {
       await sns.publish({
         TopicArn: process.env.TASK_DEADLINE_TOPIC,
         Message: JSON.stringify({
+          type: 'TASK DEADLINE',
           taskId: task.taskId,
-          userId: user.userId,
           taskName: task.name,
           deadline: task.deadline
         }),
@@ -103,7 +103,7 @@ exports.handler = async (event) => {
             taskDescription: task.description,
             taskResponsibility: task.responsibility,
             deadline: task.deadline,
-            recipientName: `${user.firstName} ${user.lastName}`.trim(),
+            recipientName: `${user.name}`.trim(),
             message: `URGENT: Task "${task.name}" deadline is approaching soon: ${new Date(task.deadline).toLocaleString()}`,
             taskId: task.taskId
           }),

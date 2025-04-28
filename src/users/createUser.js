@@ -3,7 +3,6 @@ const cognito = new AWS.CognitoIdentityServiceProvider();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const sfn = new AWS.StepFunctions();
 const { generateSecurePassword } = require("../../utils/helpers");
-const cuid = require("cuid");
 const { COMMON } = require("../../utils/constants");
 
 exports.handler = async (event) => {
@@ -53,8 +52,6 @@ exports.handler = async (event) => {
             })
             .promise();
 
-        //console.log("User details: ", user);
-
         // Add user to appropriate Cognito group based on role
         await cognito
             .adminAddUserToGroup({
@@ -64,8 +61,16 @@ exports.handler = async (event) => {
             })
             .promise();
 
-        //user id
-        const userId = cuid()
+        // Get the user info to extract the sub ID
+        const userInfo = await cognito
+            .adminGetUser({
+                UserPoolId: process.env.COGNITO_USER_POOL_ID,
+                Username: email
+            })
+            .promise();
+            
+        // Extract the Cognito sub ID
+        const userId = userInfo.UserAttributes.find(attr => attr.Name === "sub").Value;
 
         await dynamodb
             .put({

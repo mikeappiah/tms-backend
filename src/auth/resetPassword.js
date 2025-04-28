@@ -3,6 +3,7 @@ const { COMMON } = require("../../utils/constants");
 const { getCookies } = require("../../utils/helpers");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
 	try {
@@ -40,8 +41,53 @@ exports.handler = async (event) => {
 
 		const response = await cognito.adminRespondToAuthChallenge(params).promise();
 
-		console.log("------------RESPONSE------------", response);
+		// Get user details including group membership
+		const userInfo = await cognito.adminGetUser({
+			UserPoolId: process.env.COGNITO_USER_POOL_ID,
+			Username: username
+		}).promise();
 
+		// Get user's groups
+		const userGroups = await cognito.adminListGroupsForUser({
+			UserPoolId: process.env.COGNITO_USER_POOL_ID,
+			Username: username
+		}).promise();
+
+		// Determine role based on group membership
+		let role = COMMON.ROLE.MEMBER; // Default role
+		if (userGroups.Groups.some(group => group.GroupName === process.env.ADMIN_GROUP_NAME)) {
+			role = COMMON.ROLE.ADMIN;
+		}
+
+		// Get user data from DynamoDB
+		const userData = await dynamodb.query({
+			TableName: process.env.USERS_TABLE,
+			IndexName: "EmailIndex", // Assuming there's a GSI on the email field
+			KeyConditionExpression: "email = :email",
+			ExpressionAttributeValues: {
+				":email": username
+			}
+		}).promise();
+
+		let user = {};
+		
+		// If we have user data in DynamoDB, use that as the base
+		if (userData.Items && userData.Items.length > 0) {
+			user = { ...userData.Items[0] };
+		}
+		
+		// Add/overwrite with Cognito data
+		user.email = username;
+		user.role = role;
+		user.groups = userGroups.Groups.map(group => group.GroupName);
+		
+		// Extract user attributes from Cognito
+		userInfo.UserAttributes.forEach(attr => {
+			user[attr.Name] = attr.Value;
+		});
+		
+		// Add authentication info
+		user.passwordResetTime = new Date().toISOString();
 
 		return {
 			statusCode: 200,
@@ -53,6 +99,7 @@ exports.handler = async (event) => {
 			},
 			body: JSON.stringify({
 				message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,
+				user: user
 			}),
 		};
 	} catch (error) {

@@ -2,6 +2,7 @@ const AWS = require("aws-sdk");
 const { COMMON } = require("../../utils/constants");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
     try {
@@ -34,17 +35,65 @@ exports.handler = async (event) => {
             };
         }
 
-        // Return tokens on successful authentication
+        // Get user details including group membership
+        const userInfo = await cognito.adminGetUser({
+            UserPoolId: process.env.COGNITO_USER_POOL_ID,
+            Username: username
+        }).promise();
+
+        // Get user's groups
+        const userGroups = await cognito.adminListGroupsForUser({
+            UserPoolId: process.env.COGNITO_USER_POOL_ID,
+            Username: username
+        }).promise();
+
+        // Determine role based on group membership
+        let role = COMMON.ROLE.MEMBER; // Default role
+        if (userGroups.Groups.some(group => group.GroupName === process.env.ADMIN_GROUP_NAME)) {
+            role = COMMON.ROLE.ADMIN;
+        }
+
+        // Get user data from DynamoDB
+        const userData = await dynamodb.query({
+            TableName: process.env.USERS_TABLE,
+            IndexName: "EmailIndex", // Assuming there's a GSI on the email field
+            KeyConditionExpression: "email = :email",
+            ExpressionAttributeValues: {
+                ":email": username
+            }
+        }).promise();
+
+        let user = {};
+        
+        // If we have user data in DynamoDB, use that as the base
+        if (userData.Items && userData.Items.length > 0) {
+            user = { ...userData.Items[0] };
+        }
+        
+        // Add/overwrite with Cognito data
+        user.email = username;
+        user.role = role;
+        user.groups = userGroups.Groups.map(group => group.GroupName);
+        
+        // Extract user attributes from Cognito
+        userInfo.UserAttributes.forEach(attr => {
+            user[attr.Name] = attr.Value;
+        });
+        
+        // Add authentication info
+        user.authenticationTime = new Date().toISOString();
+
+        // Return tokens and user info on successful authentication
         return {
             statusCode: COMMON.STATUS_CODES.OK,
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
                 "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
-
             },
             body: JSON.stringify({
                 success: true,
+                user: user
             }),
         };
     } catch (error) {
@@ -66,7 +115,7 @@ exports.handler = async (event) => {
         }
 
         return {
-            statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
+            statusCode: statusCode,
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,

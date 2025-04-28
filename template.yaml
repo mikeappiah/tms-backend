@@ -308,6 +308,8 @@ Resources:
       Policies:
       - AmazonCognitoPowerUser
       - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
       Events:
         SignIn:
           Type: Api
@@ -327,6 +329,8 @@ Resources:
       Policies:
       - AmazonCognitoPowerUser
       - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
       Events:
         ResetPassword:
           Type: Api
