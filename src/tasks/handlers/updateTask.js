@@ -12,12 +12,10 @@ exports.handler = async (event) => {
         const taskId = event.pathParameters.taskId;
         const { status, userComment } = JSON.parse(event.body);
 
-        // Validate required fields
         if (!taskId) {
             return errorResponse(400, 'taskId is required');
         }
 
-        // Fetch task
         const tasksService = new DynamoService(process.env.TASKS_TABLE);
         const task = await tasksService.getItem({ taskId });
 
@@ -25,13 +23,24 @@ exports.handler = async (event) => {
             return errorResponse(404, 'Task not found');
         }
 
-        // Check authorization - user must own the task or be an admin
         const isAdminUser = isAdmin(claims, process.env.ADMIN_GROUP_NAME);
         const ownsTask = isTaskOwner(task, userId, username);
 
         if (!ownsTask && !isAdminUser) {
             console.log(`Authorization failed: Task userId=${task.userId}, Cognito sub=${userId}, username=${username}`);
             return errorResponse(403, 'Not authorized to update this task');
+        }
+
+        // 👉 Role-based update permission checks
+        if (isAdminUser) {
+            if (userComment !== undefined) {
+                return errorResponse(403, 'Admins are not allowed to update userComment');
+            }
+        } else {
+            // User (non-admin)
+            if (status === undefined && userComment === undefined) {
+                return errorResponse(400, 'Users can only update status or userComment');
+            }
         }
 
         // Prepare update expression
@@ -52,7 +61,8 @@ exports.handler = async (event) => {
             }
         }
 
-        if (userComment !== undefined) {
+        if (!isAdminUser && userComment !== undefined) {
+            // Only allow userComment update if NOT admin
             updateExpression.push('userComment = :userComment');
             expressionAttributeValues[':userComment'] = userComment;
         }
@@ -67,9 +77,7 @@ exports.handler = async (event) => {
 
         console.log("Task updated successfully:", taskId);
 
-        // Notify admin via SNS if task completed
         if (status === 'completed') {
-            // Use the stored userId from the task for notification purposes
             const completedBy = task.userId;
             const displayName = username || userId;
 
