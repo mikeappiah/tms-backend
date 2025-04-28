@@ -72,7 +72,6 @@ exports.handler = async (event) => {
                     email,
                     name,
                     role,
-                    profile_pic: "",
                     createdAt: new Date().toISOString(),
                     createdBy: claims.sub,
                 },

@@ -40,9 +40,10 @@ exports.handler = async (event) => {
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
+                "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`
             },
             body: JSON.stringify({
-                token: response.AuthenticationResult.IdToken,
+                success: true,
             }),
         };
     } catch (error) {
