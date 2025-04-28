@@ -32,7 +32,7 @@ exports.handler = async (event) => {
       const task = taskResult.Item;
       const user = userResult.Item;
 
-      // Send assignment notification
+      // Send assignment notification - TARGETING SPECIFIC USER
       console.log(`Sending task assignment notification to ${user.email}`);
       await sns.publish({
         TopicArn: process.env.TASK_ASSIGNMENT_TOPIC,
@@ -48,11 +48,11 @@ exports.handler = async (event) => {
         }),
         MessageAttributes: {
           email: { DataType: 'String', StringValue: user.email },
-          userId: { DataType: 'String', StringValue: userId }
+          userId: { DataType: 'String', StringValue: user.userId }
         }
       }).promise();
 
-      // Deadline notification topic for deadline reminders
+      // Deadline notification topic for deadline reminders - TARGETING SPECIFIC USER
       await sns.publish({
         TopicArn: process.env.TASK_DEADLINE_TOPIC,
         Message: JSON.stringify({
@@ -63,7 +63,7 @@ exports.handler = async (event) => {
         }),
         MessageAttributes: {
           email: { DataType: 'String', StringValue: user.email },
-          userId: { DataType: 'String', StringValue: userId }
+          userId: { DataType: 'String', StringValue: user.userId }
         }
       }).promise();
 
@@ -84,7 +84,8 @@ exports.handler = async (event) => {
                 taskId,
                 userId,
                 taskName: task.name,
-                deadlineTime: task.deadline
+                deadlineTime: task.deadline,
+                recipientEmail: user.email // Include email for targeting
               }),
               Time: oneHourBefore
             }
@@ -108,7 +109,7 @@ exports.handler = async (event) => {
           }),
           MessageAttributes: {
             email: { DataType: 'String', StringValue: user.email },
-            userId: { DataType: 'String', StringValue: userId }
+            userId: { DataType: 'String', StringValue: user.userId }
           }
         }).promise();
       }

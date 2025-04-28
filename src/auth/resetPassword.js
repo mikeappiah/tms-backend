@@ -38,7 +38,10 @@ exports.handler = async (event) => {
 			Session: session,
 		};
 
-		await cognito.adminRespondToAuthChallenge(params).promise();
+		const response = await cognito.adminRespondToAuthChallenge(params).promise();
+
+		console.log("------------RESPONSE------------", response);
+
 
 		return {
 			statusCode: 200,
@@ -46,6 +49,7 @@ exports.handler = async (event) => {
 				"Access-Control-Allow-Origin":
 					COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
 				"Content-Type": COMMON.HEADERS.CONTENT_TYPE,
+				"Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
 			},
 			body: JSON.stringify({
 				message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,

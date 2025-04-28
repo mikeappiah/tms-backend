@@ -1,25 +1,28 @@
 const AWS = require("aws-sdk");
-const COMMON = require("../../utils/constants");
+const { COMMON } = require("../../utils/constants");
 
 const sns = new AWS.SNS();
 
 exports.handler = async (event) => {
     try {
-        // Extract email from the event object directly
-        let email;
+        // Extract email and userId from the event object
+        let email, userId;
 
         if (typeof event === "object") {
             if (event.email) {
                 // Direct object containing email field
                 email = event.email;
+                userId = event.userId;
             } else if (event.input && typeof event.input === "string") {
-                // If input is provided as a JSON string (uncommon case though)
+                // If input is provided as a JSON string
                 const parsed = JSON.parse(event.input);
                 email = parsed.email;
+                userId = parsed.userId;
             } else if (event.body && typeof event.body === "string") {
                 // From API Gateway
                 const parsed = JSON.parse(event.body);
                 email = parsed.email;
+                userId = parsed.userId;
             }
         }
 
@@ -28,12 +31,23 @@ exports.handler = async (event) => {
             throw new Error("Invalid or missing email address in the input");
         }
 
-        // Subscribe to SNS Topic
+        // Check if userId was found
+        if (!userId) {
+            throw new Error("Missing userId in the input");
+        }
+
+        // Subscribe to SNS Topic with filter policy that includes BOTH email AND userId
         const subscriptionResult = await sns
             .subscribe({
                 TopicArn: process.env.TASK_ASSIGNMENT_TOPIC,
                 Protocol: "email",
                 Endpoint: email,
+                Attributes: {
+                    FilterPolicy: JSON.stringify({
+                        email: [email],
+                        userId: [userId]
+                    })
+                }
             })
             .promise();
 

@@ -64,11 +64,14 @@ exports.handler = async (event) => {
             })
             .promise();
 
+        //user id
+        const userId = cuid()
+
         await dynamodb
             .put({
                 TableName: process.env.USERS_TABLE,
                 Item: {
-                    userId: cuid(),
+                    userId,
                     email,
                     name,
                     role,
@@ -83,8 +86,8 @@ exports.handler = async (event) => {
             .startExecution({
                 stateMachineArn: process.env.SUBSCRIBE_USER_STATE_MACHINE_ARN,
                 input: JSON.stringify({
-                    userId: user.User.Username,
-                    email,
+                    userId,
+                    email
                 }),
             })
             .promise();
