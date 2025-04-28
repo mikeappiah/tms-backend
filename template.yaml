@@ -36,7 +36,6 @@ Globals:
         REGION: !Ref AWS::Region
         ENVIRONMENT: !Ref Environment
         FRONTEND_URL: localhost:3000/tms/signin
-        SES_SENDER_EMAIL: no-reply@tms-nodejs-group.com
 
 Resources:
   # DynamoDB Tables
@@ -381,6 +380,33 @@ Resources:
             Method: GET
             RestApiId: !Ref ApiGateway
 
+  DeleteUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-DeleteUserFunction'
+      CodeUri: ./
+      Handler: src/users/deleteUser.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminDeleteUser
+              Resource: 
+                - !GetAtt CognitoUserPool.Arn
+    Events:
+      Events:
+        ListUsers:
+          Type: Api
+          Properties:
+            Path: /users/{userId}
+            Method: DELETE
+            RestApiId: !Ref ApiGateway
+
+
   # Lambda Functions - Tasks
   CreateTaskFunction:
     Type: AWS::Serverless::Function
@@ -635,6 +661,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ListUsersFunction}'
+      RetentionInDays: !If [ IsProd, 30, 7 ]
+
+  DeleteUserFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${DeleteUserFunction}'
       RetentionInDays: !If [ IsProd, 30, 7 ]
 
   CreateTaskFunctionLogGroup:

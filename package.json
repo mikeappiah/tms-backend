@@ -4,7 +4,9 @@
   "description": "Backend for Task Management System",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "sam-validate": "sam validate && sam validate --lint",
+    "sam-deploy": "npm run sam-validate && sam build --parallel && sam deploy --config-env test"
   },
   "dependencies": {
     "aws-sdk": "^2.1650.0",

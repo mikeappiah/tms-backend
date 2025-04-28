@@ -43,18 +43,17 @@ exports.handler = async (event) => {
         const user = await cognito
             .adminCreateUser({
                 UserPoolId: process.env.COGNITO_USER_POOL_ID,
-                name,
-                email,
+                Username: email,
                 TemporaryPassword: tempPassword,
                 UserAttributes: [
                     { Name: "email", Value: email },
                     { Name: "email_verified", Value: "true" }, // Not bothering ourselves with email verification now!
                 ],
-                MessageAction: "SUPPRESS",
+                //MessageAction: "SUPPRESS",
             })
             .promise();
 
-        console.log("User details: ", user);
+        //console.log("User details: ", user);
 
         // Add user to appropriate Cognito group based on role
         await cognito

@@ -21,6 +21,8 @@ exports.handler = async (event) => {
             };
         }
 
+        console.log('Claims: ', claims)
+
         const { userId } = event.pathParameters;
 
         if (!userId) {
@@ -55,8 +57,10 @@ exports.handler = async (event) => {
 
         const user = userResponse.Item;
 
+        console.log('DYNAMODB USER DETAILS: ', user)
+
         // Preventing admins from deleting themselves
-        if (user.userId === claims.sub) {
+        if (user.email === claims.email) {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
@@ -73,7 +77,7 @@ exports.handler = async (event) => {
         await cognito
             .adminDeleteUser({
                 UserPoolId: process.env.COGNITO_USER_POOL_ID,
-                Username: userId,
+                Username: user.email,
             })
             .promise();
 
