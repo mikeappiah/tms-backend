@@ -397,9 +397,8 @@ Resources:
                 - cognito-idp:AdminDeleteUser
               Resource: 
                 - !GetAtt CognitoUserPool.Arn
-    Events:
       Events:
-        ListUsers:
+        DeleteUser:
           Type: Api
           Properties:
             Path: /users/{userId}
