@@ -11,6 +11,11 @@ Parameters:
     - prod
     Description: Environment name
 
+  AdminEmails: #For SNS Topic subscriptions
+    Type: CommaDelimitedList
+    Default: john.kponyo@amalitech.com,julius.markwei@amalitech.com,michael.appiah@amalitech.com
+    Description: List of administrator emails for notifications
+
 Conditions:
   IsProd: !Equals [ !Ref Environment, 'prod' ]
 
@@ -25,6 +30,7 @@ Globals:
         USERS_TABLE: !Ref UsersTable
         NOTIFICATIONS_TABLE: !Ref NotificationsTable
         TASK_ASSIGNMENT_TOPIC: !Ref TaskAssignmentNotificationTopic
+        TASK_DELETE_TOPIC: !Ref TaskDeleteNotificationTopic
         TASK_DEADLINE_TOPIC: !Ref TaskDeadlineNotificationTopic
         CLOSED_TASK_TOPIC: !Ref ClosedTaskNotificationTopic
         TASK_COMPLETE_TOPIC: !Ref TaskCompleteNotificationTopic
@@ -192,6 +198,54 @@ Resources:
     Properties:
       TopicName: !Sub '${Environment}-TaskCompleteNotificationTopic'
 
+  TaskDeleteNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-TaskDeleteNotificationTopic'
+
+  #Admin SNS Subscriptions - 3 admin emails
+  AdminTaskCompleteSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [0, !Ref AdminEmails]
+      TopicArn: !Ref TaskCompleteNotificationTopic
+
+  AdminTaskCompleteSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [1, !Ref AdminEmails]
+      TopicArn: !Ref TaskCompleteNotificationTopic
+
+  AdminTaskCompleteSubscription3:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [2, !Ref AdminEmails]
+      TopicArn: !Ref TaskCompleteNotificationTopic
+
+  AdminClosedTaskSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [0, !Ref AdminEmails]
+      TopicArn: !Ref ClosedTaskNotificationTopic
+
+  AdminClosedTaskSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [1, !Ref AdminEmails]
+      TopicArn: !Ref ClosedTaskNotificationTopic
+
+  AdminClosedTaskSubscription3:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Select [2, !Ref AdminEmails]
+      TopicArn: !Ref ClosedTaskNotificationTopic
+
   # SQS Queues
   TaskQueue:
     Type: AWS::SQS::Queue
@@ -259,6 +313,12 @@ Resources:
                   Type: Task
                   Resource: !GetAtt SubscribeClosedFunction.Arn
                   End: true
+            - StartAt: SubscribeDeleted
+              States:
+                SubscribeDeleted:
+                  Type: Task
+                  Resource: !GetAtt SubscribeDeletedFunction.Arn
+                  End: true
           Complete:
             Type: Succeed
       Policies:
@@ -268,6 +328,8 @@ Resources:
           FunctionName: !Ref SubscribeDeadlineFunction
       - LambdaInvokePolicy:
           FunctionName: !Ref SubscribeClosedFunction
+      - LambdaInvokePolicy:
+          FunctionName: !Ref SubscribeDeletedFunction
       - CloudWatchLogsFullAccess
 
   ProcessDeadlineStateMachine:
@@ -307,20 +369,17 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref Environment
+      #CORS configuration
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key'"
+        AllowOrigin: "'*'"  # For development; will be restrict to our frontend domain in production
+        MaxAge: "'600'"
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
           CognitoAuthorizer:
             UserPoolArn: !GetAtt CognitoUserPool.Arn
-      Cors:
-        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization'"
-        AllowOrigin: "'*'"
-      MethodSettings:
-      - ResourcePath: "/*"
-        HttpMethod: "*"
-        ThrottlingBurstLimit: !If [ IsProd, 50, 20 ]
-        ThrottlingRateLimit: !If [ IsProd, 25, 10 ]
 
   # Lambda Functions - Auth
   SignInFunction:
@@ -465,6 +524,8 @@ Resources:
       - AWSLambdaBasicExecutionRole
       - DynamoDBCrudPolicy:
           TableName: !Ref TasksTable
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
       - SNSPublishMessagePolicy:
           TopicName: !GetAtt TaskCompleteNotificationTopic.TopicName
       Events:
@@ -473,6 +534,28 @@ Resources:
           Properties:
             Path: /tasks/{taskId}
             Method: PUT
+            RestApiId: !Ref ApiGateway
+
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-DeleteTaskFunction'
+      CodeUri: ./
+      Handler: src/tasks/deleteTask.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TaskDeleteNotificationTopic.TopicName
+      Events:
+        DeleteUser:
+          Type: Api
+          Properties:
+            Path: /tasks/{taskId}
+            Method: DELETE
             RestApiId: !Ref ApiGateway
 
   ReopenTaskFunction:
@@ -570,6 +653,17 @@ Resources:
       - AWSLambdaBasicExecutionRole
       - SNSCrudPolicy:
           TopicName: !GetAtt ClosedTaskNotificationTopic.TopicName
+
+  SubscribeDeletedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SubscribeDeletedFunction'
+      CodeUri: ./
+      Handler: src/notifications/subscribeDeleted.handler
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - SNSCrudPolicy:
+          TopicName: !GetAtt TaskDeleteNotificationTopic.TopicName
 
   # Lambda Functions - Queues
   ProcessTaskQueueFunction:
@@ -720,6 +814,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ListTasksFunction}'
+      RetentionInDays: !If [ IsProd, 30, 7 ]
+
+  DeleteTaskFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${DeleteTaskFunction}'
       RetentionInDays: !If [ IsProd, 30, 7 ]
 
 Outputs:

@@ -1,6 +1,6 @@
 const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
-const sqs = new AWS.SQS();
+const sns = new AWS.SNS();
 
 exports.handler = async (event) => {
   try {
@@ -17,7 +17,9 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Methods': 'POST, DELETE, GET, OPTIONS, PUT',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         },
         body: JSON.stringify({ error: 'Task ID is required' })
       };
@@ -42,8 +44,8 @@ exports.handler = async (event) => {
       };
     }
     
-    // Verify user has permission (admin or task owner)
-    if (!isAdmin && task.userId !== userId) {
+    // Verify user has permission (admin)
+    if (!isAdmin) {
       return {
         statusCode: 403,
         headers: {
@@ -54,23 +56,62 @@ exports.handler = async (event) => {
       };
     }
     
+    // Get user details from USERS_TABLE
+    const userResponse = await dynamodb.get({
+      TableName: process.env.USERS_TABLE,
+      Key: { userId: task.userId }
+    }).promise();
+    
+    const user = userResponse.Item;
+    
+    if (!user) {
+      console.error('User not found for task:', task);
+    }
+
+    // Format deadline date
+    const formattedDeadline = task.deadline ? new Date(task.deadline).toLocaleString() : 'No deadline';
+    
     // Delete the task
     await dynamodb.delete({
       TableName: process.env.TASKS_TABLE,
       Key: { taskId }
     }).promise();
     
-    // Send delete message to SQS for any necessary cleanup
-    await sqs.sendMessage({
-      QueueUrl: process.env.TASK_QUEUE,
-      MessageBody: JSON.stringify({ 
-        taskId,
-        userId: task.userId,
-        action: 'DELETE' 
-      }),
-      MessageGroupId: taskId,
-      MessageDeduplicationId: `${taskId}-delete-${Date.now()}`
-    }).promise();
+    // Create nicely formatted email for task deletion
+    const taskDeleteEmailContent = `
+Dear ${user ? user.name : 'User'},
+
+🚫 TASK DELETED ❌
+
+The following task previously assigned to you has been deleted:
+
+DELETED TASK DETAILS:
+---------------------------------
+Task: ${task.name}
+Description: ${task.description}
+Supposed Deadline: ${formattedDeadline}
+---------------------------------
+
+You no more have access to this task.
+
+Thank you,
+Task Management System
+    `.trim();
+
+    // Send only the formatted email content to SNS (not the JSON)
+    if (user && user.email) {
+      await sns.publish({
+        TopicArn: process.env.TASK_DELETE_TOPIC,
+        Message: taskDeleteEmailContent,
+        Subject: `DELETED: Task removed - ${task.name}`,
+        MessageAttributes: {
+          email: { DataType: 'String', StringValue: user.email },
+          userId: { DataType: 'String', StringValue: user.userId }
+        }
+      }).promise();
+    } else {
+      console.warn('Could not send deletion notification - user details not found');
+    }
     
     return {
       statusCode: 200,

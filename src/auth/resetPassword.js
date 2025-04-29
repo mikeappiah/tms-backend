@@ -7,11 +7,11 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
 	try {
-		// const cookies = getCookies(event.headers);
-		// const session = cookies.session;
+		const cookies = getCookies(event.headers);
+		const session = cookies.session;
 
 		
-		const { username, newPassword, session } = JSON.parse(event.body);
+		const { username, newPassword } = JSON.parse(event.body);
 		if (!session) {
 			return {
 				statusCode: COMMON.STATUS_CODES.UNAUTHORIZED,
@@ -92,10 +92,9 @@ exports.handler = async (event) => {
 		return {
 			statusCode: 200,
 			headers: {
-				"Access-Control-Allow-Origin":
-					COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
+				"Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
 				"Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-				// "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
+				"Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly`,
 			},
 			body: JSON.stringify({
 				message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,

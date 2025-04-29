@@ -26,7 +26,7 @@ exports.handler = async (event) => {
                 headers: {
                     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                    // "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`,
+                    "Set-Cookie": `session=${response.Session}; HttpOnly`,
                 },
                 body: JSON.stringify({
                     challenge: "NEW_PASSWORD_REQUIRED",
@@ -90,7 +90,7 @@ exports.handler = async (event) => {
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                // "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
+                "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly`,
             },
             body: JSON.stringify({
                 success: true,
