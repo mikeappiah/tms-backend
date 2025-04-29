@@ -26,11 +26,12 @@ exports.handler = async (event) => {
                 headers: {
                     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                    "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`,
+                    // "Set-Cookie": `session=${response.Session}; HttpOnly; Secure; SameSite=Strict`,
                 },
                 body: JSON.stringify({
                     challenge: "NEW_PASSWORD_REQUIRED",
                     message: COMMON.ERROR.NEW_PASSWORD_REQUIRED,
+                    session: response.Session
                 }),
             };
         }
@@ -89,11 +90,12 @@ exports.handler = async (event) => {
             headers: {
                 "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
                 "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
+                // "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
             },
             body: JSON.stringify({
                 success: true,
-                user: user
+                user: user,
+                token: response.AuthenticationResult.IdToken
             }),
         };
     } catch (error) {

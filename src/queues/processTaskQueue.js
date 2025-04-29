@@ -32,40 +32,112 @@ exports.handler = async (event) => {
       const task = taskResult.Item;
       const user = userResult.Item;
 
-      // Send assignment notification - TARGETING SPECIFIC USER
+      // Format deadline for display
+      const formattedDeadline = new Date(task.deadline).toLocaleString('en-US', {
+        weekday: 'long',
+        month: 'long', 
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true
+      });
+
+      // Create nicely formatted email string for task assignment
+      const assignmentEmailContent = `
+Dear ${user.name},
+
+You have been assigned a new task in the task management system.
+
+TASK DETAILS:
+---------------------------------
+Name: ${task.name}
+Description: ${task.description}
+Responsibility: ${task.responsibility}
+Deadline: ${formattedDeadline}
+---------------------------------
+
+Please log in to the system to view more details and track your progress.
+
+Thank you,
+Task Management System
+      `.trim();
+
+      // Create notification data object for database storage
+      const assignmentNotificationData = {
+        type: 'TASK_ASSIGNED',
+        taskName: task.name,
+        taskDescription: task.description,
+        taskResponsibility: task.responsibility,
+        deadline: task.deadline,
+        recipientName: `${user.name}`.trim(),
+        message: `Task "${task.name}" has been assigned to you. Deadline: ${formattedDeadline}`,
+        taskId: task.taskId
+      };
+
       console.log(`Sending task assignment notification to ${user.email}`);
+      
+      // Send only the formatted email content to SNS (not the JSON)
       await sns.publish({
         TopicArn: process.env.TASK_ASSIGNMENT_TOPIC,
-        Message: JSON.stringify({
-          type: 'TASK_ASSIGNED',
-          taskName: task.name,
-          taskDescription: task.description,
-          taskResponsibility: task.responsibility,
-          deadline: task.deadline,
-          recipientName: `${user.name}`.trim(),
-          message: `Task "${task.name}" has been assigned to you. Deadline: ${new Date(task.deadline).toLocaleString()}`,
-          taskId: task.taskId
-        }),
+        Message: assignmentEmailContent,
+        Subject: `New Task Assignment: ${task.name}`,
         MessageAttributes: {
           email: { DataType: 'String', StringValue: user.email },
           userId: { DataType: 'String', StringValue: user.userId }
         }
       }).promise();
 
-      // Deadline notification topic for deadline reminders - TARGETING SPECIFIC USER
+      // Store the notification data in NOTIFICATIONS_TABLE
+      await storeNotification(user.userId, 'TASK_ASSIGNED', {
+        ...assignmentNotificationData,
+        //emailContent: assignmentEmailContent
+      });
+
+      // Create nicely formatted email string for deadline notification
+      const deadlineEmailContent = `
+Dear ${user.name},
+
+This is a reminder about your upcoming task deadline.
+
+TASK DEADLINE REMINDER:
+---------------------------------
+Task: ${task.name}
+Deadline: ${formattedDeadline}
+---------------------------------
+
+Please ensure you complete this task before the deadline.
+
+Thank you,
+Task Management System
+      `.trim();
+
+      // Create notification data object for database storage
+      const deadlineNotificationData = {
+        type: 'TASK_DEADLINE',
+        taskId: task.taskId,
+        taskName: task.name,
+        deadline: task.deadline,
+        recipientName: `${user.name}`.trim(),
+        message: `Reminder: Task "${task.name}" is due at ${formattedDeadline}`
+      };
+
+      // Send only the formatted email content to SNS (not the JSON)
       await sns.publish({
         TopicArn: process.env.TASK_DEADLINE_TOPIC,
-        Message: JSON.stringify({
-          type: 'TASK DEADLINE',
-          taskId: task.taskId,
-          taskName: task.name,
-          deadline: task.deadline
-        }),
+        Message: deadlineEmailContent,
+        Subject: `Task Deadline Reminder: ${task.name}`,
         MessageAttributes: {
           email: { DataType: 'String', StringValue: user.email },
           userId: { DataType: 'String', StringValue: user.userId }
         }
       }).promise();
+
+      // Store the notification data in NOTIFICATIONS_TABLE (with the email content)
+      await storeNotification(user.userId, 'TASK_DEADLINE', {
+        ...deadlineNotificationData,
+        //emailContent: deadlineEmailContent
+      });
 
       // Schedule deadline notification (1 hour before)
       const deadline = new Date(task.deadline);
@@ -94,24 +166,55 @@ exports.handler = async (event) => {
       } else if (deadline > now) {
         console.log(`Deadline too soon for 1-hour notice, sending immediate reminder`);
         
-        // Sending immediate reminder If less than 1 hour to deadline but still in future
+        // Create nicely formatted email for imminent deadline
+        const imminentDeadlineEmailContent = `
+Dear ${user.name},
+
+⚠️ URGENT REMINDER ⚠️
+
+The following task deadline is rapidly approaching:
+
+URGENT TASK DEADLINE:
+---------------------------------
+Task: ${task.name}
+Description: ${task.description}
+Deadline: ${formattedDeadline}
+---------------------------------
+
+Please prioritize this task as it must be completed very soon.
+
+Thank you,
+Task Management System
+        `.trim();
+
+        // Create notification data object for database storage
+        const imminentNotificationData = {
+          type: 'TASK_DEADLINE_IMMINENT',
+          taskName: task.name,
+          taskDescription: task.description,
+          taskResponsibility: task.responsibility,
+          deadline: task.deadline,
+          recipientName: `${user.name}`.trim(),
+          message: `URGENT: Task "${task.name}" deadline is approaching soon: ${formattedDeadline}`,
+          taskId: task.taskId
+        };
+
+        // Send only the formatted email content to SNS (not the JSON)
         await sns.publish({
           TopicArn: process.env.TASK_DEADLINE_TOPIC,
-          Message: JSON.stringify({
-            type: 'TASK_DEADLINE_IMMINENT',
-            taskName: task.name,
-            taskDescription: task.description,
-            taskResponsibility: task.responsibility,
-            deadline: task.deadline,
-            recipientName: `${user.name}`.trim(),
-            message: `URGENT: Task "${task.name}" deadline is approaching soon: ${new Date(task.deadline).toLocaleString()}`,
-            taskId: task.taskId
-          }),
+          Message: imminentDeadlineEmailContent,
+          Subject: `URGENT: Task Deadline Approaching - ${task.name}`,
           MessageAttributes: {
             email: { DataType: 'String', StringValue: user.email },
             userId: { DataType: 'String', StringValue: user.userId }
           }
         }).promise();
+
+        // Store the notification data in NOTIFICATIONS_TABLE
+        await storeNotification(user.userId, 'TASK_DEADLINE_IMMINENT', {
+          ...imminentNotificationData,
+          //emailContent: imminentDeadlineEmailContent
+        });
       }
       
       // Updating task to mark notification as sent
@@ -140,3 +243,29 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// Helper function to store notifications in the NOTIFICATIONS_TABLE
+async function storeNotification(userId, notificationType, notificationData) {
+  try {
+    const timestamp = new Date().toISOString();
+    const notificationId = `${userId}:${timestamp}`;
+    
+    await dynamodb.put({
+      TableName: process.env.NOTIFICATIONS_TABLE,
+      Item: {
+        userId,
+        notificationId,
+        timestamp,
+        type: notificationType,
+        read: false,
+        data: notificationData,
+        createdAt: timestamp
+      }
+    }).promise();
+    
+    console.log(`Notification stored for user ${userId} with ID ${notificationId}`);
+  } catch (error) {
+    console.error('Error storing notification:', error);
+    // Continue processing even if notification storage fails
+  }
+}

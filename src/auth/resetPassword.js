@@ -1,15 +1,17 @@
 const AWS = require("aws-sdk");
 const { COMMON } = require("../../utils/constants");
-const { getCookies } = require("../../utils/helpers");
+// const { getCookies } = require("../../utils/helpers");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
 	try {
-		const cookies = getCookies(event.headers);
-		const session = cookies.session;
+		// const cookies = getCookies(event.headers);
+		// const session = cookies.session;
 
+		
+		const { username, newPassword, session } = JSON.parse(event.body);
 		if (!session) {
 			return {
 				statusCode: COMMON.STATUS_CODES.UNAUTHORIZED,
@@ -24,8 +26,6 @@ exports.handler = async (event) => {
 				}),
 			};
 		}
-
-		const { username, newPassword } = JSON.parse(event.body);
 
 		// Using adminRespondToAuthChallenge flow
 		const params = {
@@ -95,11 +95,12 @@ exports.handler = async (event) => {
 				"Access-Control-Allow-Origin":
 					COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
 				"Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-				"Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
+				// "Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly; Secure; SameSite=Strict`,
 			},
 			body: JSON.stringify({
 				message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,
-				user: user
+				user: user,
+				token: response.AuthenticationResult.IdToken
 			}),
 		};
 	} catch (error) {

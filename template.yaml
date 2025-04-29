@@ -23,6 +23,7 @@ Globals:
       Variables:
         TASKS_TABLE: !Ref TasksTable
         USERS_TABLE: !Ref UsersTable
+        NOTIFICATIONS_TABLE: !Ref NotificationsTable
         TASK_ASSIGNMENT_TOPIC: !Ref TaskAssignmentNotificationTopic
         TASK_DEADLINE_TOPIC: !Ref TaskDeadlineNotificationTopic
         CLOSED_TASK_TOPIC: !Ref ClosedTaskNotificationTopic
@@ -80,6 +81,29 @@ Resources:
       - IndexName: EmailIndex
         KeySchema:
         - AttributeName: email
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [ IsProd, true, false ]
+
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-NotificationsTable'
+      AttributeDefinitions:
+      - AttributeName: userId
+        AttributeType: S
+      - AttributeName: notificationId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: userId
+        KeyType: HASH
+      GlobalSecondaryIndexes:
+      - IndexName: NotificationIndex
+        KeySchema:
+        - AttributeName: notificationId
           KeyType: HASH
         Projection:
           ProjectionType: ALL
@@ -558,6 +582,8 @@ Resources:
       - AWSLambdaBasicExecutionRole
       - DynamoDBCrudPolicy:
           TableName: !Ref TasksTable
+      - DynamoDBCrudPolicy:
+          TableName: !Ref NotificationsTable
       - DynamoDBReadPolicy:
           TableName: !Ref UsersTable
       - SNSPublishMessagePolicy:
