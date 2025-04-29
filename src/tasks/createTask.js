@@ -16,6 +16,9 @@ exports.handler = async (event) => {
         statusCode: 403,
         headers: {
           'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+          'Access-Control-Allow-Credentials': true,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ error: 'Admin access required' })
@@ -42,6 +45,9 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: {
           'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+          'Access-Control-Allow-Credentials': true,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ error: 'Invalid deadline format. Use ISO date format.' })
@@ -89,6 +95,9 @@ exports.handler = async (event) => {
       statusCode: 201,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+        'Access-Control-Allow-Credentials': true,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 
@@ -112,6 +121,9 @@ exports.handler = async (event) => {
       statusCode: 500,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+        'Access-Control-Allow-Credentials': true,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 

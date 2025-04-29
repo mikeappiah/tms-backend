@@ -38,10 +38,6 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      // headers: {
-      //     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-      //     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-      // },
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -59,10 +55,6 @@ exports.handler = async (event) => {
     
     return {
       statusCode: 500,
-    //   headers: {
-    //     "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-    //     "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-    // },
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',

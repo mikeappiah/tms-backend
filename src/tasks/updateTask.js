@@ -16,9 +16,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.MISSING_TASKID }),
             };
         }
@@ -35,9 +38,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.NOT_FOUND,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.TASK_NOT_FOUND }),
             };
         }
@@ -56,9 +62,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.FORBIDDEN,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.NOT_AUTHORIZED_TO_UPDATE }),
             };
         }
@@ -134,9 +143,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: "No valid fields to update" }),
             };
         }
@@ -194,6 +206,9 @@ exports.handler = async (event) => {
             console.warn("Could not fetch completing user data:", err);
         }
 
+        console.log('TASK OWNER: ', taskOwnerUser)
+        console.log('COMPLETING USER: ', completingUser)
+
         // Format deadline date
         const formattedDeadline = taskResult.Item.deadline 
             ? new Date(taskResult.Item.deadline).toLocaleString() 
@@ -215,7 +230,7 @@ Description: ${taskResult.Item.description}
 Responsibility: ${taskResult.Item.responsibility}
 
 Assigned To: ${taskOwnerUser.name}
-Marked As Completed By: ${completingUser.name}, @ ${new Date().toISOString()}
+Marked As Completed By: ${completingUser.name || 'Admin'}, @ ${new Date().toISOString()}
 
 Supposed Deadline: ${formattedDeadline}
 ---------------------------------
@@ -245,9 +260,12 @@ Task Management System
         return {
             statusCode: 200,
             headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 message: "Task updated successfully",
                 taskId,
@@ -262,9 +280,12 @@ Task Management System
         return {
             statusCode: 500,
             headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 error: "Internal server error",
                 code: error.code || "InternalServerError",

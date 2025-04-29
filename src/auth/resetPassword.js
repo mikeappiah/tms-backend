@@ -92,10 +92,13 @@ exports.handler = async (event) => {
 		return {
 			statusCode: 200,
 			headers: {
-				"Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-				"Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-				"Set-Cookie": `token=${response.AuthenticationResult.IdToken}; HttpOnly`,
-			},
+				'Access-Control-Allow-Origin': '*',
+				'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+				'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+				'Access-Control-Allow-Credentials': true,
+				'Content-Type': 'application/json',
+				"Set-Cookie": `token=${response.AuthenticationResult.IdToken}; Path=/; HttpOnly`,
+			  },
 			body: JSON.stringify({
 				message: COMMON.SUCCESS_MSG.PASSWORD_RESET_SUCCESS,
 				user: user,
@@ -135,10 +138,12 @@ exports.handler = async (event) => {
 		return {
 			statusCode,
 			headers: {
-				"Access-Control-Allow-Origin":
-					COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-				"Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-			},
+				'Access-Control-Allow-Origin': '*',
+				'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+				'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+				'Access-Control-Allow-Credentials': true,
+				'Content-Type': 'application/json'
+			  },
 			body: JSON.stringify({
 				error: errorMessage,
 				code: error.code || COMMON.ERROR.UNKNOWN_ERROR,

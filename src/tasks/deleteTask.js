@@ -117,6 +117,9 @@ Task Management System
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+        'Access-Control-Allow-Credentials': true,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -132,6 +135,9 @@ Task Management System
       statusCode: 500,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+        'Access-Control-Allow-Credentials': true,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 

@@ -14,9 +14,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.FORBIDDEN,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({
                     error: COMMON.ERROR.ADMIN_ACCESS_REQUIRED,
                 }),
@@ -29,9 +32,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.BAD_CREDENTIALS }),
             };
         }
@@ -100,9 +106,12 @@ exports.handler = async (event) => {
         return {
             statusCode: COMMON.STATUS_CODES.CREATED,
             headers: {
-                "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 message: COMMON.SUCCESS_MSG.USER_CREATED,
                 email: process.env.ENVIRONMENT === "test" ? email : undefined,
@@ -130,9 +139,12 @@ exports.handler = async (event) => {
         return {
             statusCode,
             headers: {
-                "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 error: errorMessage,
                 code: error.code || COMMON.ERROR.INTERNAL_SERVER_ERROR,
