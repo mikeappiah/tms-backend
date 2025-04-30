@@ -57,6 +57,7 @@ exports.handler = async (event) => {
                     description: task.description,
                     status: task.status,
                     deadline: task.deadline,
+                    userComment: task.userComment,
                     taskOwner: task.taskOwner,
                 })),
               }),

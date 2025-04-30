@@ -1,6 +1,6 @@
 const AWS = require("aws-sdk");
 const { COMMON } = require("../../utils/constants");
-// const { getCookies } = require("../../utils/helpers");
+const { getCookies } = require("../../utils/helpers");
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
