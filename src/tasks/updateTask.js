@@ -170,7 +170,6 @@ exports.handler = async (event) => {
         // Fetch user data for the task owner and the user completing the task
         const taskOwnerId = taskResult.Item.userId;
         let taskOwnerUser = null;
-        let completingUser = null;
 
         // Get task owner
         if (taskOwnerId) {
@@ -190,24 +189,7 @@ exports.handler = async (event) => {
             }
         }
 
-        // Get data for the user marking the task as completed
-        try {
-            const completingUserResult = await dynamodb
-                .get({
-                    TableName: process.env.USERS_TABLE,
-                    Key: { userId },
-                })
-                .promise();
-            
-            if (completingUserResult.Item) {
-                completingUser = completingUserResult.Item;
-            }
-        } catch (err) {
-            console.warn("Could not fetch completing user data:", err);
-        }
-
         console.log('TASK OWNER: ', taskOwnerUser)
-        console.log('COMPLETING USER: ', completingUser)
 
         // Format deadline date
         const formattedDeadline = taskResult.Item.deadline 
@@ -229,8 +211,7 @@ Task: ${taskResult.Item.name}
 Description: ${taskResult.Item.description}
 Responsibility: ${taskResult.Item.responsibility}
 
-Assigned To: ${taskOwnerUser.name}
-Marked As Completed By: ${completingUser.name || 'Admin'}, @ ${new Date().toISOString()}
+Completed By: ${taskOwnerUser.name}
 
 Supposed Deadline: ${formattedDeadline}
 ---------------------------------

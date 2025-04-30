@@ -424,6 +424,26 @@ Resources:
             Auth:
               Authorizer: NONE
 
+  SignOutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-SignOutFunction'
+      CodeUri: ./
+      Handler: src/auth/signout.handler
+      Policies:
+      - AmazonCognitoPowerUser
+      - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
+      Events:
+        SignIn:
+          Type: Api
+          Properties:
+            Path: /signout
+            Method: POST
+            RestApiId: !Ref ApiGateway
+
+
   # Lambda Functions - Users
   CreateUserFunction:
     Type: AWS::Serverless::Function
@@ -773,6 +793,12 @@ Resources:
     Properties:
       LogGroupName: !Sub '/aws/lambda/${ResetPasswordFunction}'
       RetentionInDays: !If [ IsProd, 30, 7 ]
+
+  SignOutFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SignOutFunction}'
+      RetentionInDays: !If [ IsProd, 30, 7 ]  
 
   CreateUserFunctionLogGroup:
     Type: AWS::Logs::LogGroup
