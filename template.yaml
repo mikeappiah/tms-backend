@@ -588,6 +588,8 @@ Resources:
       - AWSLambdaBasicExecutionRole
       - DynamoDBCrudPolicy:
           TableName: !Ref TasksTable
+      - DynamoDBCrudPolicy:
+          TableName: !Ref UsersTable
       - SNSPublishMessagePolicy:
           TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
       - SQSSendMessagePolicy:

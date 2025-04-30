@@ -167,7 +167,7 @@ exports.handler = async (event) => {
 
         console.log("Task updated successfully:", taskId);
 
-        // Fetch user data for the task owner and the user completing the task
+        // Fetch user data for the task owner
         const taskOwnerId = taskResult.Item.userId;
         let taskOwnerUser = null;
 

@@ -17,43 +17,52 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.FORBIDDEN,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.ADMIN_ACCESS_REQUIRED }),
             };
         }
 
         const taskId = event.pathParameters.taskId;
         const requestBody = JSON.parse(event.body);
-        const { userId, username } = requestBody;
+        const { userId } = requestBody;
 
         // Validate required fields
         if (!taskId) {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.TASK_ID_REQUIRED }),
             };
         }
 
-        if (!userId && !username) {
+        if (!userId) {
             return {
                 statusCode: COMMON.STATUS_CODES.BAD_REQUEST,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.USERID_OR_USERNAME_REQUIRED }),
             };
         }
 
-        const effectiveUserId = userId || username;
+        const effectiveUserId = userId;
 
-        // Verify task exists
+        // Verify task's existence
         const taskResult = await dynamodb
             .get({
                 TableName: process.env.TASKS_TABLE,
@@ -65,9 +74,12 @@ exports.handler = async (event) => {
             return {
                 statusCode: COMMON.STATUS_CODES.NOT_FOUND,
                 headers: {
-                    "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                    "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-                },
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                    'Access-Control-Allow-Credentials': true,
+                    'Content-Type': 'application/json'
+                  },
                 body: JSON.stringify({ error: COMMON.ERROR.TASK_NOT_FOUND }),
             };
         }
@@ -95,26 +107,62 @@ exports.handler = async (event) => {
 
         console.log(`Task reopened successfully: ${taskId}, assigned to: ${effectiveUserId}`);
 
-        // Prepare user display name for notifications
-        const userDisplayName = username || userId;
+        let taskOwnerUser = null
+
+        // Get task owner
+        if (effectiveUserId) {
+            try {
+                const taskOwnerResult = await dynamodb
+                    .get({
+                        TableName: process.env.USERS_TABLE,
+                        Key: { userId: effectiveUserId },
+                    })
+                    .promise();
+                
+                if (taskOwnerResult.Item) {
+                    taskOwnerUser = taskOwnerResult.Item;
+                }
+            } catch (err) {
+                console.warn("Could not fetch task owner user data:", err);
+            }
+        }
+
+        // Format deadline date
+        const formattedDeadline = taskResult.Item.deadline 
+            ? new Date(taskResult.Item.deadline).toLocaleString() 
+            : 'No deadline';
+
+        // Create nicely formatted email for task completion
+        const taskReopenEmailContent = `
+Dear ${taskOwnerUser.name},
+
+⚠️ TASK RE-ASSIGNED 📌
+
+The following task has been reopened and assigned to you!:
+
+REOPENED/RE-ASSIGNED TASK DETAILS:
+---------------------------------
+Task: ${taskResult.Item.name}
+Description: ${taskResult.Item.description}
+Responsibility: ${taskResult.Item.responsibility}
+Administrator's Comment: ${requestBody.adminComment || "NIL"}
+
+Deadline: ${formattedDeadline}
+---------------------------------
+
+Thank you!
+Task Management System
+        `.trim();
 
         // Notify the assigned user via SNS
         await sns
             .publish({
                 TopicArn: process.env.TASK_ASSIGNMENT_TOPIC,
-                Message: JSON.stringify({
-                    message: `A task ${taskResult.Item.name} has been reopened and assigned to you`,
-                    taskId: taskId,
-                    taskName: taskResult.Item.name,
-                    taskDescription: taskResult.Item.description,
-                    deadline: taskResult.Item.deadline,
-                    reopenedBy: adminUsername,
-                    reopenedAt: new Date().toISOString(),
-                    adminComment: requestBody.adminComment || "", // Just there for in case
-                }),
-                Subject: `Task Reopened: ${taskResult.Item.name}`,
+                Message: taskReopenEmailContent,
+                Subject: `REOPENED: Task reassigned - ${taskResult.Item.name}`,
                 MessageAttributes: {
-                    userId: { DataType: "String", StringValue: effectiveUserId },
+                  email: { DataType: 'String', StringValue: taskOwnerUser.email },
+                  userId: { DataType: 'String', StringValue: effectiveUserId }
                 },
             })
             .promise();
@@ -124,9 +172,12 @@ exports.handler = async (event) => {
         return {
             statusCode: COMMON.STATUS_CODES.OK,
             headers: {
-                "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 message: COMMON.SUCCESS_MSG.TASK_OPENED,
                 taskId,
@@ -139,9 +190,12 @@ exports.handler = async (event) => {
         return {
             statusCode: 500,
             headers: {
-                "Access-Control-Allow-Origin": COMMON.HEADERS.ACCESS_CONTROL_ALLOW_ORIGIN,
-                "Content-Type": COMMON.HEADERS.CONTENT_TYPE,
-            },
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key',
+                'Access-Control-Allow-Credentials': true,
+                'Content-Type': 'application/json'
+              },
             body: JSON.stringify({
                 error: "Internal server error",
                 message: error.message,
