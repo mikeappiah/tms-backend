@@ -20,33 +20,24 @@ exports.handler = async (event) => {
             };
         }
 
-        const queryParams = event.queryStringParameters || {};
-        const limit = parseInt(queryParams.limit) || 50;
-        const lastEvaluatedKey = queryParams.nextToken
-            ? JSON.parse(Buffer.from(queryParams.nextToken, "base64").toString())
-            : undefined;
-
-        // Scan the table with pagination
+        // Scan the table
         const params = {
             TableName: process.env.USERS_TABLE,
-            Limit: limit,
+            ScanFilter: {
+                role: {
+                    ComparisonOperator: "EQ",
+                    AttributeValueList: [COMMON.ROLE.MEMBER],
+                },
+            },
         };
-
-        if (lastEvaluatedKey) {
-            params.ExclusiveStartKey = lastEvaluatedKey;
-        }
 
         const result = await dynamodb.scan(params).promise();
 
-        // Prepare response with pagination token if needed
+        // Prepare response
         const response = {
             users: result.Items,
             count: result.Count,
         };
-
-        if (result.LastEvaluatedKey) {
-            response.nextToken = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64");
-        }
 
         return {
             statusCode: COMMON.STATUS_CODES.OK,
