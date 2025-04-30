@@ -54,6 +54,22 @@ exports.handler = async (event) => {
       };
     }
 
+   // Get task owner
+    const taskOwnerResult = await dynamodb
+        .get({
+            TableName: process.env.USERS_TABLE,
+            Key: { userId },
+        })
+        .promise();
+   
+    const taskOwnerUser = taskOwnerResult.Item;
+      
+    const taskOwner = {
+      userId,
+      name: taskOwnerUser.name,
+      email: taskOwnerUser.email
+    }
+
     // Generate task ID
     const taskId = uuidv4();
     
@@ -71,6 +87,7 @@ exports.handler = async (event) => {
       createdBy: claims.sub,
       createdAt: new Date().toISOString(),
       lastUpdatedAt: new Date().toISOString(),
+      taskOwner
     };
 
     // Store in TasksTable
@@ -110,6 +127,7 @@ exports.handler = async (event) => {
           responsibility,
           status: 'open',
           deadline,
+          taskOwner
         }
       })
     };

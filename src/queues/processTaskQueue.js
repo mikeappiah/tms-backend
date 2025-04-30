@@ -164,6 +164,7 @@ Task Management System
           ]
         }).promise();
       } else if (deadline > now) {
+        
         console.log(`Deadline too soon for 1-hour notice, sending immediate reminder`);
         
         // Create nicely formatted email for imminent deadline
@@ -199,7 +200,7 @@ Task Management System
           taskId: task.taskId
         };
 
-        // Send only the formatted email content to SNS (not the JSON)
+        // Sending formatted email content to SNS
         await sns.publish({
           TopicArn: process.env.TASK_DEADLINE_TOPIC,
           Message: imminentDeadlineEmailContent,

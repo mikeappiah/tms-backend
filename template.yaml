@@ -524,6 +524,8 @@ Resources:
       - AWSLambdaBasicExecutionRole
       - DynamoDBCrudPolicy:
           TableName: !Ref TasksTable
+      - DynamoDBReadPolicy:
+          TableName: !Ref UsersTable
       - SQSSendMessagePolicy:
           QueueName: !GetAtt TaskQueue.QueueName
       Events:
