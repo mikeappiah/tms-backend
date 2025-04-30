@@ -52,16 +52,14 @@ exports.handler = async (event) => {
             body: JSON.stringify({
                 message: "Tasks retrieved successfully",
                 tasks: result.Items.map((task) => ({
-                    taskId: task.id,
-                    title: task.title,
+                    taskId: task.taskId,
+                    name: task.name,
                     description: task.description,
                     status: task.status,
                     deadline: task.deadline,
-                    responsibility: task.taskOwner,
-                    createdAt: task.createdAt,
-                    updatedAt: task.updatedAt,
+                    taskOwner: task.taskOwner,
                 })),
-            }),
+              }),
         };
     } catch (error) {
         console.error("List tasks error:", error);

@@ -32,7 +32,7 @@ exports.handler = async () => {
       try {
         // Notify the assigned user about approaching deadline
         await sns.publish({
-          TopicArn: process.env.TASK_NOTIFICATION_TOPIC,
+          TopicArn: process.env.TASK_DEADLINE_TOPIC,
           Message: JSON.stringify({
             message: `DEADLINE APPROACHING: Your task "${task.name}" is due within the next hour!`,
             taskId: task.taskId,

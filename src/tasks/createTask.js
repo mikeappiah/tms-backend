@@ -25,10 +25,10 @@ exports.handler = async (event) => {
       };
     }
 
-    const { userId, name, description, responsibility, deadline } = JSON.parse(event.body);
+    const { userId, name, description, deadline } = JSON.parse(event.body);
     
     // Validate inputs
-    if (!name || !description || !responsibility || !deadline || !userId) {
+    if (!name || !description || !deadline || !userId) {
       return {
         statusCode: 400,
         headers: {
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
       userId,
       name,
       description,
-      responsibility,
+      responsibility: description,
       status: 'open',
       userComment: '',
       deadline,
@@ -121,11 +121,8 @@ exports.handler = async (event) => {
         message: 'Task created successfully',
         task: {
           taskId,
-          userId,
           name,
           description,
-          responsibility,
-          status: 'open',
           deadline,
           taskOwner
         }

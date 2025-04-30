@@ -157,14 +157,14 @@ Task Management System
                 userId,
                 taskName: task.name,
                 deadlineTime: task.deadline,
-                recipientEmail: user.email // Include email for targeting
+                recipientEmail: user.email // Including email for targeting
               }),
               Time: oneHourBefore
             }
           ]
         }).promise();
       } else if (deadline > now) {
-        
+
         console.log(`Deadline too soon for 1-hour notice, sending immediate reminder`);
         
         // Create nicely formatted email for imminent deadline
