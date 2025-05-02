@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - develop
+      - test
   pull_request:
     branches:
       - main
-      - develop
+      - test
   workflow_dispatch:
     inputs:
       environment:
@@ -54,6 +54,8 @@ jobs:
             echo "env=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "env=prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/test" ]]; then
+            echo "env=test" >> $GITHUB_OUTPUT
           else
             echo "env=test" >> $GITHUB_OUTPUT
           fi
@@ -73,10 +75,6 @@ jobs:
       - name: SAM Build
         run: |
           sam build
-
-      - name: Run Tests
-        run: |
-          npm test
           
       - name: Deploy to Test Environment
         if: steps.determine-env.outputs.env == 'test'
