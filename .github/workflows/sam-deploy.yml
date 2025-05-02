@@ -1,0 +1,113 @@
+name: Deploy SAM Application
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: eu-central-1
+      PYTHON_VERSION: '3.9'
+      NODE_VERSION: '16'
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install dependencies
+        run: |
+          npm install
+          pip install aws-sam-cli
+
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "env=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "env=prod" >> $GITHUB_OUTPUT
+          else
+            echo "env=test" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup SAM config
+        run: |
+          echo "Using environment: ${{ steps.determine-env.outputs.env }}"
+          mkdir -p .aws-sam/build
+
+      - name: SAM Build
+        run: |
+          sam build
+
+      - name: Run Tests
+        run: |
+          npm test
+          
+      - name: Deploy to Test Environment
+        if: steps.determine-env.outputs.env == 'test'
+        run: |
+          sam deploy \
+            --stack-name tms-backend-test-stack \
+            --s3-bucket tms-backend-test-bkt \
+            --s3-prefix tms-backend-test-stack \
+            --region eu-central-1 \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --parameter-overrides Environment=test \
+            --no-confirm-changeset
+
+      - name: Deploy to Production Environment
+        if: steps.determine-env.outputs.env == 'prod'
+        run: |
+          sam deploy \
+            --stack-name tms-backend-prod-stack \
+            --s3-bucket tms-backend-prod-bkt \
+            --s3-prefix prod-artifacts \
+            --region eu-central-1 \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --parameter-overrides Environment=prod \
+            --fail-on-empty-changeset \
+            --no-confirm-changeset
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment to ${{ steps.determine-env.outputs.env }} environment was successful"
+          else
+            echo "❌ Deployment to ${{ steps.determine-env.outputs.env }} environment failed"
+          fi
