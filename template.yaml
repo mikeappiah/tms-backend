@@ -373,7 +373,7 @@ Resources:
       Cors:
         AllowMethods: "'*'"
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key'"
-        AllowOrigin: "'*'"  # For development; will be restrict to our frontend domain in production
+        AllowOrigin: "'*'"
         MaxAge: "'600'"
       Auth:
         DefaultAuthorizer: CognitoAuthorizer

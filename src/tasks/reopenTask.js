@@ -29,7 +29,7 @@ exports.handler = async (event) => {
 
         const taskId = event.pathParameters.taskId;
         const requestBody = JSON.parse(event.body);
-        const { userId } = requestBody;
+        const { userId, deadline } = requestBody;
 
         // Validate required fields
         if (!taskId) {
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
                     'Access-Control-Allow-Credentials': true,
                     'Content-Type': 'application/json'
                   },
-                body: JSON.stringify({ error: COMMON.ERROR.USERID_OR_USERNAME_REQUIRED }),
+                body: JSON.stringify({ error: 'userId required' }),
             };
         }
 
@@ -86,26 +86,6 @@ exports.handler = async (event) => {
 
         console.log(`Task found: ${taskId}, current status: ${taskResult.Item.status}`);
 
-        // Update task
-        const updateResult = await dynamodb
-            .update({
-                TableName: process.env.TASKS_TABLE,
-                Key: { taskId },
-                UpdateExpression:
-                    "SET #status = :status, userId = :userId, completedAt = :completedAt, lastUpdatedAt = :lastUpdatedAt, adminComment = :adminComment",
-                ExpressionAttributeNames: { "#status": "status" },
-                ExpressionAttributeValues: {
-                    ":status": "open",
-                    ":userId": effectiveUserId,
-                    ":completedAt": null,
-                    ":lastUpdatedAt": new Date().toISOString(),
-                    ":adminComment": requestBody.adminComment || "",
-                },
-                ReturnValues: "ALL_NEW",
-            })
-            .promise();
-
-        console.log(`Task reopened successfully: ${taskId}, assigned to: ${effectiveUserId}`);
 
         let taskOwnerUser = null
 
@@ -127,10 +107,41 @@ exports.handler = async (event) => {
             }
         }
 
+
+        //task owner object
+        const taskOwner = {
+            userId: taskOwnerUser.userId,
+            name: taskOwnerUser.name,
+            email: taskOwnerUser.email
+          }
+
+        // Update task
+        const updateResult = await dynamodb
+            .update({
+                TableName: process.env.TASKS_TABLE,
+                Key: { taskId },
+                UpdateExpression:
+                    "SET #status = :status, userId = :userId, completedAt = :completedAt, lastUpdatedAt = :lastUpdatedAt, deadline = :deadline, taskOwner = :taskOwner",
+                ExpressionAttributeNames: { "#status": "status" },
+                ExpressionAttributeValues: {
+                    ":status": "open",
+                    ":userId": effectiveUserId,
+                    ":completedAt": null,
+                    ":lastUpdatedAt": new Date().toISOString(),
+                    ":deadline": deadline,
+                    ":taskOwner": taskOwner
+                },
+                ReturnValues: "ALL_NEW",
+            })
+            .promise();
+
+        console.log(`Task reopened successfully: ${taskId}, assigned to: ${effectiveUserId}`);
+
+
         // Format deadline date
         const formattedDeadline = taskResult.Item.deadline 
             ? new Date(taskResult.Item.deadline).toLocaleString() 
-            : 'No deadline';
+            : new Date(deadline).toLocaleString() ;
 
         // Create nicely formatted email for task completion
         const taskReopenEmailContent = `
@@ -145,7 +156,6 @@ REOPENED/RE-ASSIGNED TASK DETAILS:
 Task: ${taskResult.Item.name}
 Description: ${taskResult.Item.description}
 Responsibility: ${taskResult.Item.responsibility}
-Administrator's Comment: ${requestBody.adminComment || "NIL"}
 
 Deadline: ${formattedDeadline}
 ---------------------------------

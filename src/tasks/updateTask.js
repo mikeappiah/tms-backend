@@ -50,7 +50,7 @@ exports.handler = async (event) => {
 
         // Check authorization - user must own the task or be an admin
         const userGroups = claims["cognito:groups"];
-        const isAdmin = userGroups.includes(process.env.ADMIN_GROUP_NAME);
+        const isAdmin = userGroups && userGroups.includes(process.env.ADMIN_GROUP_NAME);
 
         // Check task ownership
         const isTaskOwner = taskResult.Item.userId === userId;
@@ -137,6 +137,7 @@ exports.handler = async (event) => {
                 expressionAttributeValues[":userComment"] = requestBody.userComment;
             }
         }
+        
 
         // Only proceed if there are fields to update
         if (Object.keys(expressionAttributeValues).length <= 1) {
@@ -153,16 +154,23 @@ exports.handler = async (event) => {
             };
         }
 
+        // Prepare update params
+        const updateParams = {
+            TableName: process.env.TASKS_TABLE,
+            Key: { taskId },
+            UpdateExpression: updateExpression.join(", "),
+            ExpressionAttributeValues: expressionAttributeValues,
+            ReturnValues: "ALL_NEW",
+        };
+        
+        // Only include ExpressionAttributeNames if it's not empty
+        if (Object.keys(expressionAttributeNames).length > 0) {
+            updateParams.ExpressionAttributeNames = expressionAttributeNames;
+        }
+
         // Update task in DynamoDB
         const updatedTask = await dynamodb
-            .update({
-                TableName: process.env.TASKS_TABLE,
-                Key: { taskId },
-                UpdateExpression: updateExpression.join(", "),
-                ExpressionAttributeNames: expressionAttributeNames,
-                ExpressionAttributeValues: expressionAttributeValues,
-                ReturnValues: "ALL_NEW",
-            })
+            .update(updateParams)
             .promise();
 
         console.log("Task updated successfully:", taskId);
@@ -211,7 +219,7 @@ Task: ${taskResult.Item.name}
 Description: ${taskResult.Item.description}
 Responsibility: ${taskResult.Item.responsibility}
 
-Completed By: ${taskOwnerUser.name}
+Completed By: ${taskOwnerUser ? taskOwnerUser.name : 'Unknown User'}
 
 Supposed Deadline: ${formattedDeadline}
 ---------------------------------

@@ -45,7 +45,7 @@ exports.handler = async (event) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key",
+                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
                 "Access-Control-Allow-Credentials": true,
                 "Content-Type": "application/json",
             },
@@ -53,6 +53,7 @@ exports.handler = async (event) => {
                 message: "Tasks retrieved successfully",
                 tasks: result.Items.map((task) => ({
                     taskId: task.taskId,
+                    userId: task.userId,
                     name: task.name,
                     description: task.description,
                     status: task.status,
@@ -70,7 +71,7 @@ exports.handler = async (event) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key",
+                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
                 "Access-Control-Allow-Credentials": true,
                 "Content-Type": "application/json",
             },
