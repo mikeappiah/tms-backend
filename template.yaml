@@ -398,7 +398,7 @@ Resources:
             RestApiId: !Ref ApiGateway
 
   deleteUserFunction:
-    Type: AWS::Serverless::Fucntion
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${Environment}-DeleteUserFunction'
       CodeUri: ./src/users
