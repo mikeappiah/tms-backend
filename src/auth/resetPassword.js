@@ -7,11 +7,25 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
 	try {
-		const cookies = getCookies(event.headers);
-		const session = cookies.session;
-
+		// Get session from either request body or cookies
+		let session;
+		
+		// First check if session is in the request body
+		if (event.body) {
+			const requestBody = JSON.parse(event.body);
+			if (requestBody.session) {
+				session = requestBody.session;
+			}
+		}
+		
+		// If session not found in body, check cookies
+		if (!session) {
+			const cookies = getCookies(event.headers);
+			session = cookies.session;
+		}
 		
 		const { username, newPassword } = JSON.parse(event.body);
+		
 		if (!session) {
 			return {
 				statusCode: COMMON.STATUS_CODES.UNAUTHORIZED,

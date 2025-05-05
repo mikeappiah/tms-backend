@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "aws-sdk": "^2.1650.0",
-    "cuid": "^3.0.0",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "human-friendly-date": "^1.0.2"
   },
   "author": "",
   "license": "ISC"
